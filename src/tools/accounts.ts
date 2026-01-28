@@ -9,22 +9,29 @@ import { getAccountManager } from '../account-manager.js';
 export const listAccountsSchema = z.object({});
 
 export const switchAccountSchema = z.object({
-    accountName: z.string().describe('Name of the account to switch to (usually an email address)'),
+    account: z.string().describe('Account to switch to - can be display name (e.g., "Personal") or email address'),
 });
 
 export const getCurrentAccountSchema = z.object({});
 
 // Tool handlers
 export async function listAccounts(): Promise<{
-    accounts: string[];
+    accounts: Array<{ email: string; displayName?: string }>;
     currentAccount: string | null;
+    currentDisplayName?: string;
     configFilePath: string;
 }> {
     const manager = getAccountManager();
+    const accounts = manager.getAccounts().map(a => ({
+        email: a.name,
+        displayName: a.displayName,
+    }));
+    const current = manager.getCurrentAccount();
 
     return {
-        accounts: manager.getAccountNames(),
-        currentAccount: manager.getCurrentAccountName(),
+        accounts,
+        currentAccount: current?.name || null,
+        currentDisplayName: current?.displayName,
         configFilePath: manager.getConfigFilePath(),
     };
 }
@@ -33,38 +40,43 @@ export async function switchAccount(params: z.infer<typeof switchAccountSchema>)
     success: boolean;
     previousAccount: string | null;
     currentAccount: string | null;
+    currentDisplayName?: string;
     message: string;
 }> {
     const manager = getAccountManager();
     const previousAccount = manager.getCurrentAccountName();
 
-    const success = manager.switchAccount(params.accountName);
+    const success = manager.switchAccount(params.account);
 
     if (success) {
+        const current = manager.getCurrentAccount();
+        const displayLabel = current?.displayName || current?.name;
         return {
             success: true,
             previousAccount,
-            currentAccount: params.accountName,
-            message: `Switched from "${previousAccount}" to "${params.accountName}"`,
+            currentAccount: current?.name || null,
+            currentDisplayName: current?.displayName,
+            message: `Switched to "${displayLabel}"`,
         };
     } else {
-        const available = manager.getAccountNames();
+        const available = manager.getAccounts().map(a => a.displayName || a.name);
         return {
             success: false,
             previousAccount,
             currentAccount: previousAccount,
-            message: `Account "${params.accountName}" not found. Available accounts: ${available.join(', ') || 'none configured'}`,
+            message: `Account "${params.account}" not found. Available: ${available.join(', ') || 'none configured'}`,
         };
     }
 }
 
 export async function getCurrentAccount(): Promise<{
     accountName: string | null;
+    displayName?: string;
     hasAccounts: boolean;
     message: string;
 }> {
     const manager = getAccountManager();
-    const current = manager.getCurrentAccountName();
+    const current = manager.getCurrentAccount();
     const hasAccounts = manager.hasAccounts();
 
     if (!hasAccounts) {
@@ -75,9 +87,11 @@ export async function getCurrentAccount(): Promise<{
         };
     }
 
+    const displayLabel = current?.displayName ? `${current.displayName} (${current.name})` : current?.name;
     return {
-        accountName: current,
+        accountName: current?.name || null,
+        displayName: current?.displayName,
         hasAccounts: true,
-        message: `Current account: ${current}`,
+        message: `Current account: ${displayLabel}`,
     };
 }

@@ -53,6 +53,34 @@ import {
     tagEmails,
 } from './organize.js';
 
+// Calendar/Task tools
+import {
+    listCalendarsSchema,
+    listTasksSchema,
+    getTaskSchema,
+    createTaskSchema,
+    updateTaskSchema,
+    completeTaskSchema,
+    deleteTaskSchema,
+    listEventsSchema,
+    getEventSchema,
+    createEventSchema,
+    updateEventSchema,
+    deleteEventSchema,
+    listCalendars,
+    listTasks,
+    getTask,
+    createTask,
+    updateTask,
+    completeTask,
+    deleteTask,
+    listEvents,
+    getEvent,
+    createEvent,
+    updateEvent,
+    deleteEvent,
+} from './calendar.js';
+
 // Tool definition type
 export interface ToolDefinition {
     name: string;
@@ -144,6 +172,82 @@ export const tools: ToolDefinition[] = [
         inputSchema: tagEmailsSchema,
         handler: (params) => tagEmails(tagEmailsSchema.parse(params)),
     },
+
+    // Calendar & Tasks (CalDAV)
+    {
+        name: 'list_calendars',
+        description: 'List all calendars in the current account',
+        inputSchema: listCalendarsSchema,
+        handler: listCalendars,
+    },
+    {
+        name: 'list_tasks',
+        description: 'List tasks/todos with optional filters (status, due date, calendar)',
+        inputSchema: listTasksSchema,
+        handler: (params) => listTasks(listTasksSchema.parse(params)),
+    },
+    {
+        name: 'get_task',
+        description: 'Get full details of a specific task by URL',
+        inputSchema: getTaskSchema,
+        handler: (params) => getTask(getTaskSchema.parse(params)),
+    },
+    {
+        name: 'create_task',
+        description: 'Create a new task/todo in a calendar',
+        inputSchema: createTaskSchema,
+        handler: (params) => createTask(createTaskSchema.parse(params)),
+    },
+    {
+        name: 'update_task',
+        description: 'Update an existing task (summary, due date, status, priority, etc.)',
+        inputSchema: updateTaskSchema,
+        handler: (params) => updateTask(updateTaskSchema.parse(params)),
+    },
+    {
+        name: 'complete_task',
+        description: 'Mark a task as complete',
+        inputSchema: completeTaskSchema,
+        handler: (params) => completeTask(completeTaskSchema.parse(params)),
+    },
+    {
+        name: 'delete_task',
+        description: 'Delete a task',
+        inputSchema: deleteTaskSchema,
+        handler: (params) => deleteTask(deleteTaskSchema.parse(params)),
+    },
+
+    // Calendar Events (CalDAV)
+    {
+        name: 'list_events',
+        description: 'List calendar events with optional filters (date range, calendar)',
+        inputSchema: listEventsSchema,
+        handler: (params) => listEvents(listEventsSchema.parse(params)),
+    },
+    {
+        name: 'get_event',
+        description: 'Get full details of a specific event by URL',
+        inputSchema: getEventSchema,
+        handler: (params) => getEvent(getEventSchema.parse(params)),
+    },
+    {
+        name: 'create_event',
+        description: 'Create a new calendar event (meeting, appointment, etc.)',
+        inputSchema: createEventSchema,
+        handler: (params) => createEvent(createEventSchema.parse(params)),
+    },
+    {
+        name: 'update_event',
+        description: 'Update an existing event (title, time, location, etc.)',
+        inputSchema: updateEventSchema,
+        handler: (params) => updateEvent(updateEventSchema.parse(params)),
+    },
+    {
+        name: 'delete_event',
+        description: 'Delete a calendar event',
+        inputSchema: deleteEventSchema,
+        handler: (params) => deleteEvent(deleteEventSchema.parse(params)),
+    },
 ];
 
 // Export individual tools for testing
@@ -160,4 +264,16 @@ export {
     deleteEmails,
     markEmails,
     tagEmails,
+    listCalendars,
+    listTasks,
+    getTask,
+    createTask,
+    updateTask,
+    completeTask,
+    deleteTask,
+    listEvents,
+    getEvent,
+    createEvent,
+    updateEvent,
+    deleteEvent,
 };

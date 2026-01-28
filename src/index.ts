@@ -76,15 +76,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Main function
 async function main() {
-    // Check for accounts on startup
-    const manager = getAccountManager();
-    if (!manager.hasAccounts()) {
-        console.error(
-            'Warning: No Fastmail accounts configured.\n' +
-            'Set FASTMAIL_API_TOKEN environment variable or create:\n' +
-            `  ${manager.getConfigFilePath()}\n`
-        );
-    }
+
 
     // Start server with stdio transport
     const transport = new StdioServerTransport();

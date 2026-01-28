@@ -25,11 +25,19 @@ export const testConfig = {
     token2: process.env.TEST_TOKEN_2,
     recipient: process.env.TEST_RECIPIENT,
 
+    // CalDAV configuration
+    caldavUsername: process.env.TEST_CALDAV_USERNAME,
+    caldavPassword: process.env.TEST_CALDAV_PASSWORD,
+
     get isConfigured(): boolean {
         return !!(this.account1 && this.token1 && this.recipient);
     },
 
     get isMultiAccountConfigured(): boolean {
         return !!(this.isConfigured && this.account2 && this.token2);
+    },
+
+    get isCalDAVConfigured(): boolean {
+        return !!(this.caldavUsername && this.caldavPassword);
     },
 };

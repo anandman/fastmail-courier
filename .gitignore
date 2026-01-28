@@ -12,6 +12,7 @@ dist/
 .vscode/
 *.swp
 *.swo
+fastmail-courier.code-workspace
 
 # OS
 .DS_Store
