@@ -23,7 +23,7 @@ npm run build
    ```json
    {
      "mcpServers": {
-       "fastmail": {
+    "Fastmail Courier": {
          "command": "node",
          "args": ["/path/to/fastmail-courier/dist/index.js"]
        }
@@ -59,4 +59,4 @@ For calendar/tasks, you'll also need an app password. See [Getting Started](docs
 
 ## License
 
-MIT
+MIT - see [LICENSE](LICENSE) for details.
