@@ -31,6 +31,33 @@ npm run build
    }
    ```
 
+## Remote Hosting (Optional)
+
+Fastmail Courier defaults to local `stdio` transport. To host it remotely over Streamable HTTP:
+
+```bash
+export MCP_TRANSPORT="http"
+export MCP_HTTP_HOST="0.0.0.0"
+export MCP_HTTP_PORT="3333"
+export MCP_HTTP_PATH="/mcp"
+node dist/index.js
+```
+
+For multi-user remote hosting, enable OIDC and the encrypted vault:
+
+```bash
+export MCP_AUTH_MODE="oidc"
+export MCP_PUBLIC_URL="https://courier.example.com"
+export MCP_OIDC_ISSUER_URL="https://your-issuer.example.com"
+export MCP_OIDC_CLIENT_ID="your-client-id"
+export MCP_OIDC_CLIENT_SECRET="your-client-secret"
+export FASTMAIL_VAULT_KEY="base64-or-hex-32-byte-key"
+```
+
+Open `/ui` on your server to add Fastmail credentials per user.
+
+See [Configuration](docs/configuration.md) for full auth and vault options.
+
 For calendar/tasks, you'll also need an app password. See [Getting Started](docs/getting-started.md).
 
 ## Tools

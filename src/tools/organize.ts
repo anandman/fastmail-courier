@@ -9,22 +9,22 @@ import { getClient } from 'jmap-courier';
 
 // Tool schemas
 export const moveEmailsSchema = z.object({
-    emailIds: z.array(z.string()).describe('IDs of emails to move'),
+    emailIds: z.array(z.string()).describe('IDs of emails to move (use IDs from search_emails to avoid extra reads)'),
     mailbox: z.string().describe('Target mailbox name or ID'),
 });
 
 export const deleteEmailsSchema = z.object({
-    emailIds: z.array(z.string()).describe('IDs of emails to delete (move to trash)'),
+    emailIds: z.array(z.string()).describe('IDs of emails to delete (move to trash). Use IDs from search_emails.'),
 });
 
 export const markEmailsSchema = z.object({
-    emailIds: z.array(z.string()).describe('IDs of emails to mark'),
+    emailIds: z.array(z.string()).describe('IDs of emails to mark (use IDs from search_emails)'),
     isRead: z.boolean().optional().describe('Set read status (true = read, false = unread)'),
     isFlagged: z.boolean().optional().describe('Set flagged/starred status'),
 });
 
 export const tagEmailsSchema = z.object({
-    emailIds: z.array(z.string()).describe('IDs of emails to tag'),
+    emailIds: z.array(z.string()).describe('IDs of emails to tag (use IDs from search_emails)'),
     addKeywords: z.array(z.string()).optional().describe('Keywords/tags to add'),
     removeKeywords: z.array(z.string()).optional().describe('Keywords/tags to remove'),
 });

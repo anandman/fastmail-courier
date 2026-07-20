@@ -24,3 +24,8 @@ npm-debug.log*
 
 # Optional: local config backup
 *.local.json
+
+# Agent files
+HANDOFF.md
+AGENTS.md
+vault_test.json

@@ -2,6 +2,14 @@
 
 Complete reference for all 22 MCP tools provided by Fastmail Courier.
 
+## Token-Smart Usage
+
+Most email tools are designed to minimize tokens if used in the right order:
+
+- Use `search_emails` with filters (`after`, `before`, `isUnread`, `mailbox`, `limit`) to get a small list of candidates.
+- `search_emails` returns **headers + snippet only**, not full bodies.
+- Use `get_email` only for the specific messages you need to read in full (it returns full body + attachments and is token-expensive).
+
 ## Account Management
 
 ### list_accounts
@@ -58,6 +66,8 @@ Search emails with filters.
 | `isFlagged` | boolean | No | Filter by flagged status |
 | `limit` | number | No | Max results (default: 20) |
 
+**Returns:** Lightweight results (headers + snippet). Does **not** include full body.
+
 ---
 
 ### get_email
@@ -68,7 +78,7 @@ Get full email content by ID.
 |------|------|----------|-------------|
 | `emailId` | string | Yes | Email ID to retrieve |
 
-**Returns:** Full email with headers, body, attachments.
+**Returns:** Full email with headers, body, attachments. This is token-expensive; prefer `search_emails` first.
 
 ---
 

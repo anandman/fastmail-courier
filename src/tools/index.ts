@@ -94,19 +94,19 @@ export const tools: ToolDefinition[] = [
     // Account Management
     {
         name: 'list_accounts',
-        description: 'List all configured Fastmail accounts and show the current active account',
+        description: 'List configured accounts and current active account (lightweight).',
         inputSchema: listAccountsSchema,
         handler: listAccounts,
     },
     {
         name: 'switch_account',
-        description: 'Switch to a different Fastmail account',
+        description: 'Switch to a different Fastmail account (cheap; do this before other calls).',
         inputSchema: switchAccountSchema,
         handler: (params) => switchAccount(switchAccountSchema.parse(params)),
     },
     {
         name: 'get_current_account',
-        description: 'Get the currently active Fastmail account',
+        description: 'Get the currently active Fastmail account (lightweight).',
         inputSchema: getCurrentAccountSchema,
         handler: getCurrentAccount,
     },
@@ -114,7 +114,7 @@ export const tools: ToolDefinition[] = [
     // Mailboxes
     {
         name: 'list_mailboxes',
-        description: 'List all mailboxes/folders in the current account (Inbox, Sent, Drafts, etc.)',
+        description: 'List mailboxes/folders in the current account (lightweight; use to resolve mailbox names/IDs).',
         inputSchema: listMailboxesSchema,
         handler: listMailboxes,
     },
@@ -122,13 +122,13 @@ export const tools: ToolDefinition[] = [
     // Search & Read
     {
         name: 'search_emails',
-        description: 'Search for emails with various filters (mailbox, sender, date range, keywords, etc.)',
+        description: 'Search emails with filters and return lightweight results (headers + snippet). Use this to narrow scope before calling get_email.',
         inputSchema: searchEmailsSchema,
         handler: (params) => searchEmails(searchEmailsSchema.parse(params)),
     },
     {
         name: 'get_email',
-        description: 'Get the full content of an email by its ID, including body and attachments',
+        description: 'Get the full content of an email by ID (body + attachments). Token-expensive; only call for messages you really need.',
         inputSchema: getEmailSchema,
         handler: (params) => getEmail(getEmailSchema.parse(params)),
     },
@@ -136,13 +136,13 @@ export const tools: ToolDefinition[] = [
     // Send & Forward
     {
         name: 'send_email',
-        description: 'Compose and send a new email',
+        description: 'Compose and send a new email (no email bodies read).',
         inputSchema: sendEmailSchema,
         handler: (params) => sendEmail(sendEmailSchema.parse(params)),
     },
     {
         name: 'forward_email',
-        description: 'Forward an existing email to new recipients with an optional comment',
+        description: 'Forward an existing email by ID (use IDs from search_emails).',
         inputSchema: forwardEmailSchema,
         handler: (params) => forwardEmail(forwardEmailSchema.parse(params)),
     },
@@ -150,25 +150,25 @@ export const tools: ToolDefinition[] = [
     // Bulk Organization
     {
         name: 'move_emails',
-        description: 'Move one or more emails to a different mailbox/folder',
+        description: 'Move emails by ID (use search_emails to get IDs first).',
         inputSchema: moveEmailsSchema,
         handler: (params) => moveEmails(moveEmailsSchema.parse(params)),
     },
     {
         name: 'delete_emails',
-        description: 'Delete one or more emails (moves them to trash)',
+        description: 'Delete emails by ID (use search_emails to get IDs first).',
         inputSchema: deleteEmailsSchema,
         handler: (params) => deleteEmails(deleteEmailsSchema.parse(params)),
     },
     {
         name: 'mark_emails',
-        description: 'Mark one or more emails as read/unread or flagged/unflagged',
+        description: 'Mark emails by ID as read/unread/flagged (use search_emails to get IDs first).',
         inputSchema: markEmailsSchema,
         handler: (params) => markEmails(markEmailsSchema.parse(params)),
     },
     {
         name: 'tag_emails',
-        description: 'Add or remove keywords/labels on one or more emails',
+        description: 'Add/remove keywords on emails by ID (use search_emails to get IDs first).',
         inputSchema: tagEmailsSchema,
         handler: (params) => tagEmails(tagEmailsSchema.parse(params)),
     },
@@ -176,19 +176,19 @@ export const tools: ToolDefinition[] = [
     // Calendar & Tasks (CalDAV)
     {
         name: 'list_calendars',
-        description: 'List all calendars in the current account',
+        description: 'List calendars in the current account (lightweight).',
         inputSchema: listCalendarsSchema,
         handler: listCalendars,
     },
     {
         name: 'list_tasks',
-        description: 'List tasks/todos with optional filters (status, due date, calendar)',
+        description: 'List tasks with filters; use date/status filters to keep results small.',
         inputSchema: listTasksSchema,
         handler: (params) => listTasks(listTasksSchema.parse(params)),
     },
     {
         name: 'get_task',
-        description: 'Get full details of a specific task by URL',
+        description: 'Get full details of a specific task by URL (use list_tasks first).',
         inputSchema: getTaskSchema,
         handler: (params) => getTask(getTaskSchema.parse(params)),
     },
@@ -220,13 +220,13 @@ export const tools: ToolDefinition[] = [
     // Calendar Events (CalDAV)
     {
         name: 'list_events',
-        description: 'List calendar events with optional filters (date range, calendar)',
+        description: 'List calendar events with filters; always use a tight date range + limit.',
         inputSchema: listEventsSchema,
         handler: (params) => listEvents(listEventsSchema.parse(params)),
     },
     {
         name: 'get_event',
-        description: 'Get full details of a specific event by URL',
+        description: 'Get full details of a specific event by URL (use list_events first).',
         inputSchema: getEventSchema,
         handler: (params) => getEvent(getEventSchema.parse(params)),
     },

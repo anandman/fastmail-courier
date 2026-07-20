@@ -9,7 +9,7 @@ import type { EmailAddress } from 'jmap-courier';
 
 // Tool schemas
 export const getEmailSchema = z.object({
-    emailId: z.string().describe('The ID of the email to retrieve'),
+    emailId: z.string().describe('The ID of the email to retrieve (use after search_emails to minimize tokens)'),
     markAsRead: z.boolean().optional().default(true).describe('Whether to mark the email as read (default true)'),
 });
 

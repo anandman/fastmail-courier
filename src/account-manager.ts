@@ -11,6 +11,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { AccountConfig, MultiAccountConfig } from 'jmap-courier';
 import type { CalDAVConfig } from './caldav/types.js';
+import { getRequestContext } from './request-context.js';
 
 const FASTMAIL_SESSION_URL = 'https://api.fastmail.com/jmap/session';
 const FASTMAIL_CALDAV_URL = 'https://caldav.fastmail.com';
@@ -41,6 +42,14 @@ export interface ExtendedMultiAccountConfig {
     defaultAccount: string;
 }
 
+export interface AccountManagerOptions {
+    initialConfig?: ExtendedMultiAccountConfig;
+    allowEnv?: boolean;
+    allowConfigFile?: boolean;
+    configFilePath?: string;
+    onChange?: (config: ExtendedMultiAccountConfig) => void;
+}
+
 /**
  * Configuration manager for multi-account support
  */
@@ -49,80 +58,72 @@ export class AccountManager {
     private currentAccountName: string | null = null;
     /** CalDAV password from environment variable (shared across accounts) */
     private envCalDAVPassword: string | null = null;
+    private onChange?: (config: ExtendedMultiAccountConfig) => void;
 
-    constructor() {
-        this.loadConfiguration();
+    constructor(options: AccountManagerOptions = {}) {
+        this.onChange = options.onChange;
+        this.loadConfiguration(options);
     }
 
     /**
      * Load configuration from environment variable or config file
      */
-    private loadConfiguration(): void {
-        // Priority 1: Environment variables (single account)
-        const envToken = process.env.FASTMAIL_API_TOKEN;
-        const envEmail = process.env.FASTMAIL_EMAIL;
-        const envCalDAVPassword = process.env.FASTMAIL_CALDAV_PASSWORD;
-        const envCalDAVUsername = process.env.FASTMAIL_CALDAV_USERNAME;
+    private loadConfiguration(options: AccountManagerOptions): void {
+        const allowEnv = options.allowEnv ?? true;
+        const allowConfigFile = options.allowConfigFile ?? true;
+        const configFilePath = options.configFilePath ?? CONFIG_FILE;
+        const initialConfig = options.initialConfig;
 
-        // Store env CalDAV password for fallback
-        if (envCalDAVPassword) {
-            this.envCalDAVPassword = envCalDAVPassword;
+        if (initialConfig) {
+            this.applyConfig(initialConfig);
         }
 
-        if (envToken) {
-            const name = envEmail || 'default';
-            const extendedConfig: ExtendedAccountConfig = {
-                name,
-                token: envToken,
-                sessionUrl: FASTMAIL_SESSION_URL,
-            };
+        // Priority 1: Environment variables (single account)
+        if (allowEnv) {
+            const envToken = process.env.FASTMAIL_API_TOKEN;
+            const envEmail = process.env.FASTMAIL_EMAIL;
+            const envCalDAVPassword = process.env.FASTMAIL_CALDAV_PASSWORD;
+            const envCalDAVUsername = process.env.FASTMAIL_CALDAV_USERNAME;
 
-            // Add CalDAV config if password provided
+            // Store env CalDAV password for fallback
             if (envCalDAVPassword) {
-                extendedConfig.caldav = {
-                    password: envCalDAVPassword,
-                    username: envCalDAVUsername || name,
-                    serverUrl: FASTMAIL_CALDAV_URL,
-                };
+                this.envCalDAVPassword = envCalDAVPassword;
             }
 
-            this.accounts.set(name, extendedConfig);
-            this.currentAccountName = name;
+            if (envToken) {
+                const name = envEmail || 'default';
+                const extendedConfig: ExtendedAccountConfig = {
+                    name,
+                    token: envToken,
+                    sessionUrl: FASTMAIL_SESSION_URL,
+                };
+
+                // Add CalDAV config if password provided
+                if (envCalDAVPassword) {
+                    extendedConfig.caldav = {
+                        password: envCalDAVPassword,
+                        username: envCalDAVUsername || name,
+                        serverUrl: FASTMAIL_CALDAV_URL,
+                    };
+                }
+
+                this.accounts.set(name, extendedConfig);
+                this.currentAccountName = name;
+            }
         }
 
         // Priority 2: Config file (multi-account)
-        if (existsSync(CONFIG_FILE)) {
+        if (allowConfigFile && existsSync(configFilePath)) {
             // Security check: warn if config file is world-readable
-            this.checkConfigPermissions();
+            this.checkConfigPermissions(configFilePath);
 
             try {
-                const configData = readFileSync(CONFIG_FILE, 'utf-8');
+                const configData = readFileSync(configFilePath, 'utf-8');
                 const config: ExtendedMultiAccountConfig = JSON.parse(configData);
 
-                for (const account of config.accounts) {
-                    // Default to Fastmail session URL if not specified
-                    const accountConfig: ExtendedAccountConfig = {
-                        ...account,
-                        sessionUrl: account.sessionUrl || FASTMAIL_SESSION_URL,
-                    };
-
-                    // Set default CalDAV server URL if caldav config exists
-                    if (accountConfig.caldav) {
-                        accountConfig.caldav.serverUrl = accountConfig.caldav.serverUrl || FASTMAIL_CALDAV_URL;
-                        accountConfig.caldav.username = accountConfig.caldav.username || account.name;
-                    }
-
-                    this.accounts.set(account.name, accountConfig);
-                }
-
-                // Set default account if not already set from env
-                if (!this.currentAccountName && config.defaultAccount) {
-                    this.currentAccountName = config.defaultAccount;
-                } else if (!this.currentAccountName && config.accounts.length > 0) {
-                    this.currentAccountName = config.accounts[0].name;
-                }
+                this.applyConfig(config);
             } catch (error) {
-                console.error(`Failed to load config from ${CONFIG_FILE}:`, error);
+                console.error(`Failed to load config from ${configFilePath}:`, error);
             }
         }
     }
@@ -130,20 +131,48 @@ export class AccountManager {
     /**
      * Check config file permissions and warn if too permissive
      */
-    private checkConfigPermissions(): void {
+    private checkConfigPermissions(filePath: string): void {
         try {
-            const stats = statSync(CONFIG_FILE);
+            const stats = statSync(filePath);
             const mode = stats.mode;
             // Check if group or others have read permission (on Unix-like systems)
             if ((mode & 0o044) !== 0) {
                 console.warn(
-                    `WARNING: ${CONFIG_FILE} may be readable by other users. ` +
-                    `Consider running: chmod 600 "${CONFIG_FILE}"`
+                    `WARNING: ${filePath} may be readable by other users. ` +
+                    `Consider running: chmod 600 "${filePath}"`
                 );
             }
         } catch {
             // Ignore permission check errors (e.g., on Windows)
         }
+    }
+
+    private applyConfig(config: ExtendedMultiAccountConfig): void {
+        this.accounts.clear();
+        for (const account of config.accounts) {
+            const accountConfig: ExtendedAccountConfig = {
+                ...account,
+                sessionUrl: account.sessionUrl || FASTMAIL_SESSION_URL,
+            };
+
+            if (accountConfig.caldav) {
+                accountConfig.caldav.serverUrl = accountConfig.caldav.serverUrl || FASTMAIL_CALDAV_URL;
+                accountConfig.caldav.username = accountConfig.caldav.username || account.name;
+            }
+
+            this.accounts.set(account.name, accountConfig);
+        }
+
+        if (config.defaultAccount) {
+            this.currentAccountName = config.defaultAccount;
+        } else if (config.accounts.length > 0) {
+            this.currentAccountName = config.accounts[0].name;
+        }
+    }
+
+    private persist(): void {
+        if (!this.onChange) return;
+        this.onChange(this.exportConfig());
     }
 
     /**
@@ -184,6 +213,7 @@ export class AccountManager {
         // First try exact match on account key (email)
         if (this.accounts.has(identifier)) {
             this.currentAccountName = identifier;
+            this.persist();
             return true;
         }
 
@@ -191,6 +221,7 @@ export class AccountManager {
         for (const [email, account] of this.accounts.entries()) {
             if (account.displayName?.toLowerCase() === identifier.toLowerCase()) {
                 this.currentAccountName = email;
+                this.persist();
                 return true;
             }
         }
@@ -211,6 +242,8 @@ export class AccountManager {
         if (!this.currentAccountName) {
             this.currentAccountName = config.name;
         }
+
+        this.persist();
     }
 
     /**
@@ -232,6 +265,13 @@ export class AccountManager {
      */
     getConfigDirPath(): string {
         return CONFIG_DIR;
+    }
+
+    exportConfig(): ExtendedMultiAccountConfig {
+        return {
+            accounts: this.getAccounts(),
+            defaultAccount: this.currentAccountName ?? '',
+        };
     }
 
     /**
@@ -277,6 +317,10 @@ export class AccountManager {
 let accountManager: AccountManager | null = null;
 
 export function getAccountManager(): AccountManager {
+    const requestContext = getRequestContext();
+    if (requestContext?.accountManager) {
+        return requestContext.accountManager;
+    }
     if (!accountManager) {
         accountManager = new AccountManager();
     }

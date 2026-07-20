@@ -293,18 +293,30 @@ export class FastmailCalDAVClient {
             calendars = await this.getEventCalendars();
         }
 
+        // Build time range for server-side filtering and recurrence expansion.
+        // When startAfter/startBefore are provided, use them directly.
+        // Otherwise, default to now → +90 days to avoid returning ancient DTSTART values
+        // from recurring events (e.g., 1883, 1918, 1970).
+        const now = new Date();
+        const rangeStart = options?.startAfter || now.toISOString();
+        const defaultEnd = new Date(now);
+        defaultEnd.setDate(defaultEnd.getDate() + 90);
+        const rangeEnd = options?.startBefore || defaultEnd.toISOString();
+
+        const limit = options?.limit || 1000;
         const allEvents: CalendarEvent[] = [];
 
         for (const calendar of calendars) {
             try {
                 const calendarObjects = await client.fetchCalendarObjects({
                     calendar: { url: calendar.url } as DAVCalendar,
-                    filters: this.buildVEVENTFilter(options),
+                    timeRange: { start: rangeStart, end: rangeEnd },
+                    expand: true,
                 });
 
                 for (const obj of calendarObjects) {
                     const event = this.parseVEVENT(obj, calendar.url);
-                    if (event && this.matchesEventFilter(event, options)) {
+                    if (event) {
                         allEvents.push(event);
                     }
                 }
@@ -318,12 +330,8 @@ export class FastmailCalDAVClient {
             return new Date(a.start).getTime() - new Date(b.start).getTime();
         });
 
-        // Apply limit
-        if (options?.limit && allEvents.length > options.limit) {
-            return allEvents.slice(0, options.limit);
-        }
-
-        return allEvents;
+        // Apply limit after sorting
+        return allEvents.slice(0, limit);
     }
 
     /**
@@ -776,6 +784,9 @@ export class FastmailCalDAVClient {
         const organizerMatch = data.match(/^ORGANIZER[^:]*:mailto:(.*)$/mi);
         const organizer = organizerMatch ? organizerMatch[1].trim() : undefined;
 
+        // Parse RECURRENCE-ID (present on expanded recurring event instances)
+        const recurrenceIdInfo = getDateValue('RECURRENCE-ID');
+
         return {
             url: obj.url,
             etag: obj.etag || '',
@@ -792,6 +803,8 @@ export class FastmailCalDAVClient {
             lastModified: getDateValue('LAST-MODIFIED')?.value,
             calendarUrl,
             recurrenceRule: getValue('RRULE'),
+            isRecurrence: recurrenceIdInfo !== undefined,
+            recurrenceId: recurrenceIdInfo?.value,
             organizer,
             attendees: attendees.length > 0 ? attendees : undefined,
         };

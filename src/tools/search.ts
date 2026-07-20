@@ -9,8 +9,8 @@ import type { EmailFilter, EmailSummary } from 'jmap-courier';
 
 // Tool schemas
 export const searchEmailsSchema = z.object({
-    mailbox: z.string().optional().describe('Mailbox name or ID to search in (e.g., "Inbox", "Sent")'),
-    query: z.string().optional().describe('Full-text search query'),
+    mailbox: z.string().optional().describe('Mailbox name or ID to search in (e.g., "Inbox", "Sent"). Use this to narrow results and save tokens.'),
+    query: z.string().optional().describe('Full-text search query (use sparingly; can expand results).'),
     from: z.string().optional().describe('Filter by sender email or name'),
     to: z.string().optional().describe('Filter by recipient email or name'),
     subject: z.string().optional().describe('Filter by subject text'),
@@ -18,7 +18,7 @@ export const searchEmailsSchema = z.object({
     before: z.string().optional().describe('Only emails before this date (ISO 8601 format)'),
     hasAttachment: z.boolean().optional().describe('Filter by attachment presence'),
     isUnread: z.boolean().optional().describe('Filter by unread status'),
-    limit: z.number().optional().default(20).describe('Maximum number of results (default 20, max 100)'),
+    limit: z.number().optional().default(20).describe('Maximum number of results (default 20, max 100). Lower = fewer tokens.'),
 });
 
 // Tool handlers

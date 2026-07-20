@@ -18,7 +18,7 @@ function normalizeEmails(input: string | string[] | undefined): string[] {
 export const sendEmailSchema = z.object({
     to: z.union([z.string(), z.array(z.string())]).describe('Recipient email address(es)'),
     subject: z.string().describe('Email subject'),
-    body: z.string().describe('Email body (plain text)'),
+    body: z.string().describe('Email body (plain text). Keep concise if token usage matters.'),
     cc: z.union([z.string(), z.array(z.string())]).optional().describe('CC recipient(s)'),
     bcc: z.union([z.string(), z.array(z.string())]).optional().describe('BCC recipient(s)'),
     replyTo: z.string().optional().describe('Reply-to address'),
@@ -26,7 +26,7 @@ export const sendEmailSchema = z.object({
 });
 
 export const forwardEmailSchema = z.object({
-    emailId: z.string().describe('ID of the email to forward'),
+    emailId: z.string().describe('ID of the email to forward (use IDs from search_emails)'),
     to: z.union([z.string(), z.array(z.string())]).describe('Recipient email address(es)'),
     comment: z.string().optional().describe('Optional comment to add before forwarded content'),
     cc: z.union([z.string(), z.array(z.string())]).optional().describe('CC recipient(s)'),

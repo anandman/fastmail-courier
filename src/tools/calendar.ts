@@ -60,18 +60,18 @@ export async function listCalendars(): Promise<{
 // ============================================================================
 
 export const listTasksSchema = z.object({
-    calendarUrl: z.string().optional().describe('Filter to a specific calendar URL'),
+    calendarUrl: z.string().optional().describe('Filter to a specific calendar URL to keep results small'),
     status: z
         .array(z.enum(['needs-action', 'in-process', 'completed', 'cancelled']))
         .optional()
-        .describe('Filter by task status'),
+        .describe('Filter by task status to reduce results'),
     dueBefore: z.string().optional().describe('Only tasks due before this date (ISO 8601)'),
     dueAfter: z.string().optional().describe('Only tasks due after this date (ISO 8601)'),
     includeCompleted: z
         .boolean()
         .optional()
         .default(false)
-        .describe('Include completed tasks (default: false)'),
+        .describe('Include completed tasks (default: false). Keep false to reduce results.'),
 });
 
 export async function listTasks(params: z.infer<typeof listTasksSchema>): Promise<{
@@ -98,7 +98,7 @@ export async function listTasks(params: z.infer<typeof listTasksSchema>): Promis
 // ============================================================================
 
 export const getTaskSchema = z.object({
-    taskUrl: z.string().describe('URL of the task to retrieve'),
+    taskUrl: z.string().describe('URL of the task to retrieve (use list_tasks first)'),
 });
 
 export async function getTask(params: z.infer<typeof getTaskSchema>): Promise<{
@@ -120,7 +120,7 @@ export const createTaskSchema = z.object({
         .optional()
         .describe('Calendar URL to create the task in. If not provided, uses the first task-capable calendar.'),
     summary: z.string().describe('Task title/summary'),
-    description: z.string().optional().describe('Detailed description'),
+    description: z.string().optional().describe('Detailed description (keep concise if possible)'),
     due: z.string().optional().describe('Due date (ISO 8601 format, e.g., 2024-01-27 or 2024-01-27T18:00:00Z)'),
     start: z.string().optional().describe('Start date (ISO 8601 format)'),
     priority: z
@@ -172,7 +172,7 @@ export async function createTask(params: z.infer<typeof createTaskSchema>): Prom
 export const updateTaskSchema = z.object({
     taskUrl: z.string().describe('URL of the task to update'),
     summary: z.string().optional().describe('New task title'),
-    description: z.string().nullable().optional().describe('New description (null to clear)'),
+    description: z.string().nullable().optional().describe('New description (null to clear; keep concise)'),
     due: z.string().nullable().optional().describe('New due date (null to clear)'),
     start: z.string().nullable().optional().describe('New start date (null to clear)'),
     priority: z
@@ -264,10 +264,10 @@ export async function deleteTask(params: z.infer<typeof deleteTaskSchema>): Prom
 // ============================================================================
 
 export const listEventsSchema = z.object({
-    calendarUrl: z.string().optional().describe('Filter to a specific calendar URL'),
+    calendarUrl: z.string().optional().describe('Filter to a specific calendar URL to reduce results'),
     startAfter: z.string().optional().describe('Only events starting on or after this date (ISO 8601)'),
     startBefore: z.string().optional().describe('Only events starting before this date (ISO 8601)'),
-    limit: z.number().optional().describe('Maximum number of events to return'),
+    limit: z.number().optional().describe('Maximum number of events to return (lower is cheaper)'),
 });
 
 export async function listEvents(params: z.infer<typeof listEventsSchema>): Promise<{
@@ -293,7 +293,7 @@ export async function listEvents(params: z.infer<typeof listEventsSchema>): Prom
 // ============================================================================
 
 export const getEventSchema = z.object({
-    eventUrl: z.string().describe('URL of the event to retrieve'),
+    eventUrl: z.string().describe('URL of the event to retrieve (use list_events first)'),
 });
 
 export async function getEvent(params: z.infer<typeof getEventSchema>): Promise<{
@@ -315,7 +315,7 @@ export const createEventSchema = z.object({
         .optional()
         .describe('Calendar URL to create the event in. If not provided, uses the first event-capable calendar.'),
     summary: z.string().describe('Event title/summary'),
-    description: z.string().optional().describe('Detailed description'),
+    description: z.string().optional().describe('Detailed description (keep concise if possible)'),
     location: z.string().optional().describe('Event location'),
     start: z.string().describe('Start date/time (ISO 8601 format, e.g., 2024-01-27 for all-day or 2024-01-27T18:00:00Z for specific time)'),
     end: z.string().optional().describe('End date/time (ISO 8601 format)'),
@@ -366,7 +366,7 @@ export async function createEvent(params: z.infer<typeof createEventSchema>): Pr
 export const updateEventSchema = z.object({
     eventUrl: z.string().describe('URL of the event to update'),
     summary: z.string().optional().describe('New event title'),
-    description: z.string().nullable().optional().describe('New description (null to clear)'),
+    description: z.string().nullable().optional().describe('New description (null to clear; keep concise)'),
     location: z.string().nullable().optional().describe('New location (null to clear)'),
     start: z.string().optional().describe('New start date/time'),
     end: z.string().nullable().optional().describe('New end date/time (null to clear)'),

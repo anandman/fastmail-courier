@@ -190,6 +190,10 @@ export interface CalendarEvent {
     calendarUrl?: string;
     /** Recurrence rule (RRULE) if repeating */
     recurrenceRule?: string;
+    /** Whether this is an expanded recurrence instance */
+    isRecurrence?: boolean;
+    /** RECURRENCE-ID value for expanded instances (ISO 8601) */
+    recurrenceId?: string;
     /** Organizer email */
     organizer?: string;
     /** Attendees */
