@@ -65,8 +65,9 @@ For calendar/tasks, you'll also need an app password. See [Getting Started](docs
 | Category | Tools |
 |----------|-------|
 | **Accounts** | `list_accounts`, `switch_account`, `get_current_account` |
-| **Email** | `list_mailboxes`, `search_emails`, `get_email`, `send_email`, `forward_email` |
+| **Email** | `list_mailboxes`, `get_mailbox_details`, `create_mailbox`, `rename_mailbox`, `delete_mailbox`, `move_mailbox`, `set_mailbox_role`, `search_emails`, `get_email`, `send_email`, `forward_email` |
 | **Organize** | `move_emails`, `delete_emails`, `mark_emails`, `tag_emails` |
+| **Contacts** | `list_address_books`, `search_contacts`, `get_contact`, `create_contact`, `update_contact`, `delete_contact` |
 | **Calendar** | `list_calendars`, `list_events`, `get_event`, `create_event`, `update_event`, `delete_event` |
 | **Tasks** | `list_tasks`, `get_task`, `create_task`, `update_task`, `complete_task`, `delete_task` |
 

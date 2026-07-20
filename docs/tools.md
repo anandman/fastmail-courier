@@ -1,6 +1,6 @@
 # Tools Reference
 
-Complete reference for all 22 MCP tools provided by Fastmail Courier.
+Complete reference for all 34 MCP tools provided by Fastmail Courier.
 
 ## Token-Smart Usage
 
@@ -46,6 +46,71 @@ List all mailboxes/folders (Inbox, Sent, Drafts, etc.).
 **Parameters:** None
 
 **Returns:** Array of mailboxes with id, name, role, counts.
+
+---
+
+### create_mailbox
+Create a new mailbox/folder.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `name` | string | Yes | Name of the folder to create |
+| `parentId` | string | No | Optional ID of the parent folder (for nesting) |
+
+---
+
+### rename_mailbox
+Rename an existing mailbox/folder.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `id` | string | Yes | ID of the mailbox to rename |
+| `name` | string | Yes | New folder name |
+
+---
+
+### delete_mailbox
+Delete an existing mailbox/folder.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `id` | string | Yes | ID of the mailbox to delete |
+| `onDestroyRemoveEmails` | boolean | No | If true, deletes emails from the mailbox instead of failing if not empty |
+
+---
+
+### move_mailbox
+Move a mailbox/folder under a new parent (reorganize hierarchy).
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `id` | string | Yes | ID of the mailbox to move |
+| `parentId` | string | Yes (Nullable) | ID of the new parent mailbox, or null for root level |
+
+---
+
+### get_mailbox_details
+Retrieve detailed metadata (total email/thread count, unread email/thread count) for a mailbox.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `id` | string | Yes | ID of the mailbox |
+
+---
+
+### set_mailbox_role
+Set or clear the standard role of a mailbox.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `id` | string | Yes | ID of the mailbox |
+| `role` | string | Yes (Nullable) | Role to set (e.g. `inbox`, `archive`, `trash`) or null to clear role |
 
 ---
 
@@ -154,6 +219,78 @@ Add or remove keywords/labels.
 | `emailIds` | string[] | Yes | Emails to tag |
 | `addKeywords` | string[] | No | Keywords to add |
 | `removeKeywords` | string[] | No | Keywords to remove |
+
+## Contacts (RFC 9610)
+
+### list_address_books
+List contact address books.
+
+**Parameters:** None
+
+**Returns:** Array of address books containing id, name, parentId, and isDefault.
+
+---
+
+### search_contacts
+Search contacts.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `text` | string | Yes | Search term (matches name, email, phone number, etc.) |
+| `limit` | number | No | Max results to return (default 50) |
+
+---
+
+### get_contact
+Fetch details for contacts by their IDs.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `ids` | string[] | Yes | List of contact IDs to retrieve |
+
+---
+
+### create_contact
+Create a new contact in an address book.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `addressBookId` | string | Yes | ID of the address book to create the contact in |
+| `fullName` | string | Yes | Full name of the contact |
+| `email` | string | No | Email address |
+| `phone` | string | No | Phone number |
+| `company` | string | No | Company or organization name |
+| `jobTitle` | string | No | Job title |
+| `notes` | string | No | Notes or memo |
+
+---
+
+### update_contact
+Update fields on an existing contact card.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `id` | string | Yes | ID of the contact to update |
+| `fullName` | string | No | Updated full name |
+| `email` | string | No | Updated email address |
+| `phone` | string | No | Updated phone number |
+| `company` | string | No | Updated company/org name |
+| `jobTitle` | string | No | Updated job title |
+| `notes` | string | No | Updated notes or memo |
+
+---
+
+### delete_contact
+Delete a contact by ID.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `id` | string | Yes | ID of the contact to delete |
 
 ---
 
