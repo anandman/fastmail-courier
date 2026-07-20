@@ -19,7 +19,35 @@ import {
 import {
     listMailboxesSchema,
     listMailboxes,
+    createMailboxSchema,
+    createMailbox,
+    renameMailboxSchema,
+    renameMailbox,
+    deleteMailboxSchema,
+    deleteMailbox,
+    moveMailboxSchema,
+    moveMailbox,
+    getMailboxDetailsSchema,
+    getMailboxDetails,
+    setMailboxRoleSchema,
+    setMailboxRole,
 } from './mailboxes.js';
+
+// Contacts tools
+import {
+    listAddressBooksSchema,
+    listAddressBooks,
+    searchContactsSchema,
+    searchContacts,
+    getContactSchema,
+    getContact,
+    createContactSchema,
+    createContact,
+    updateContactSchema,
+    updateContact,
+    deleteContactSchema,
+    deleteContact,
+} from './contacts.js';
 
 // Search tools
 import {
@@ -118,6 +146,42 @@ export const tools: ToolDefinition[] = [
         inputSchema: listMailboxesSchema,
         handler: listMailboxes,
     },
+    {
+        name: 'create_mailbox',
+        description: 'Create a new mailbox/folder in the account.',
+        inputSchema: createMailboxSchema,
+        handler: (params) => createMailbox(createMailboxSchema.parse(params)),
+    },
+    {
+        name: 'rename_mailbox',
+        description: 'Rename an existing mailbox/folder.',
+        inputSchema: renameMailboxSchema,
+        handler: (params) => renameMailbox(renameMailboxSchema.parse(params)),
+    },
+    {
+        name: 'delete_mailbox',
+        description: 'Delete an existing mailbox/folder.',
+        inputSchema: deleteMailboxSchema,
+        handler: (params) => deleteMailbox(deleteMailboxSchema.parse(params)),
+    },
+    {
+        name: 'move_mailbox',
+        description: 'Move a mailbox/folder under a new parent (reorganize hierarchy).',
+        inputSchema: moveMailboxSchema,
+        handler: (params) => moveMailbox(moveMailboxSchema.parse(params)),
+    },
+    {
+        name: 'get_mailbox_details',
+        description: 'Get total and unread email/thread counts for a mailbox.',
+        inputSchema: getMailboxDetailsSchema,
+        handler: (params) => getMailboxDetails(getMailboxDetailsSchema.parse(params)),
+    },
+    {
+        name: 'set_mailbox_role',
+        description: 'Set or clear the standard JMAP role of a mailbox (e.g. "archive", "trash").',
+        inputSchema: setMailboxRoleSchema,
+        handler: (params) => setMailboxRole(setMailboxRoleSchema.parse(params)),
+    },
 
     // Search & Read
     {
@@ -171,6 +235,44 @@ export const tools: ToolDefinition[] = [
         description: 'Add/remove keywords on emails by ID (use search_emails to get IDs first).',
         inputSchema: tagEmailsSchema,
         handler: (params) => tagEmails(tagEmailsSchema.parse(params)),
+    },
+
+    // Contacts (RFC 9610)
+    {
+        name: 'list_address_books',
+        description: 'List contact address books.',
+        inputSchema: listAddressBooksSchema,
+        handler: listAddressBooks,
+    },
+    {
+        name: 'search_contacts',
+        description: 'Search contacts by name, email, or details.',
+        inputSchema: searchContactsSchema,
+        handler: (params) => searchContacts(searchContactsSchema.parse(params)),
+    },
+    {
+        name: 'get_contact',
+        description: 'Fetch detailed contact information by ID.',
+        inputSchema: getContactSchema,
+        handler: (params) => getContact(getContactSchema.parse(params)),
+    },
+    {
+        name: 'create_contact',
+        description: 'Create a new contact in an address book.',
+        inputSchema: createContactSchema,
+        handler: (params) => createContact(createContactSchema.parse(params)),
+    },
+    {
+        name: 'update_contact',
+        description: 'Update fields of an existing contact.',
+        inputSchema: updateContactSchema,
+        handler: (params) => updateContact(updateContactSchema.parse(params)),
+    },
+    {
+        name: 'delete_contact',
+        description: 'Delete a contact by ID.',
+        inputSchema: deleteContactSchema,
+        handler: (params) => deleteContact(deleteContactSchema.parse(params)),
     },
 
     // Calendar & Tasks (CalDAV)
@@ -256,6 +358,12 @@ export {
     switchAccount,
     getCurrentAccount,
     listMailboxes,
+    createMailbox,
+    renameMailbox,
+    deleteMailbox,
+    moveMailbox,
+    getMailboxDetails,
+    setMailboxRole,
     searchEmails,
     getEmail,
     sendEmail,
@@ -264,6 +372,12 @@ export {
     deleteEmails,
     markEmails,
     tagEmails,
+    listAddressBooks,
+    searchContacts,
+    getContact,
+    createContact,
+    updateContact,
+    deleteContact,
     listCalendars,
     listTasks,
     getTask,

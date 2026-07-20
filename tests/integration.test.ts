@@ -7,18 +7,30 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { testConfig } from './setup.js';
-import { AccountManager, resetAccountManager } from '../src/account-manager.js';
-import { JMAPClient, clearClientCache } from 'jmap-courier';
+import { AccountManager, resetAccountManager, getAccountManager } from '../src/account-manager.js';
+import { JMAPClient, clearClientCache, getClient } from 'jmap-courier';
 import {
     listAccounts,
     switchAccount,
     getCurrentAccount,
     listMailboxes,
+    createMailbox,
+    renameMailbox,
+    deleteMailbox,
+    moveMailbox,
+    getMailboxDetails,
+    setMailboxRole,
     searchEmails,
     getEmail,
     sendEmail,
     markEmails,
     tagEmails,
+    listAddressBooks,
+    searchContacts,
+    getContact,
+    createContact,
+    updateContact,
+    deleteContact,
 } from '../src/tools/index.js';
 
 describe('Fastmail MCP Server', () => {
@@ -198,6 +210,112 @@ describe('Fastmail MCP Server', () => {
             // For now, just verify the switch mechanism works
             const currentResult = await getCurrentAccount();
             expect(currentResult.hasAccounts).toBe(true);
+        });
+    });
+
+    describe('Mailbox Lifecycle Tools', () => {
+        it('can create, details, rename, move, set role, and delete a mailbox', async () => {
+            const testMailboxName = `mcp-test-${Date.now()}`;
+            
+            // 1. Create mailbox
+            const createResult = await createMailbox({ name: testMailboxName });
+            expect(createResult.success).toBe(true);
+            expect(createResult.mailbox.name).toBe(testMailboxName);
+            const mailboxId = createResult.mailbox.id;
+            expect(mailboxId).toBeDefined();
+
+            // 2. Get details
+            const detailsResult = await getMailboxDetails({ id: mailboxId });
+            expect(detailsResult.mailbox.id).toBe(mailboxId);
+            expect(detailsResult.mailbox.name).toBe(testMailboxName);
+
+            // 3. Rename mailbox
+            const renamedName = `${testMailboxName}-renamed`;
+            const renameResult = await renameMailbox({ id: mailboxId, name: renamedName });
+            expect(renameResult.success).toBe(true);
+
+            // 4. Set role
+            const roleResult = await setMailboxRole({ id: mailboxId, role: 'archive' });
+            expect(roleResult.success).toBe(true);
+            expect(roleResult.role).toBe('archive');
+
+            // Clear role
+            const clearRoleResult = await setMailboxRole({ id: mailboxId, role: null });
+            expect(clearRoleResult.success).toBe(true);
+
+            // 5. Delete mailbox
+            const deleteResult = await deleteMailbox({ id: mailboxId });
+            expect(deleteResult.success).toBe(true);
+        });
+    });
+
+    describe('Contacts Lifecycle Tools', () => {
+        it('can list, create, search, get, update, and delete contacts', async () => {
+            // Check if contacts capability is supported in the current session
+            const manager = getAccountManager();
+            const account = manager.getCurrentAccount();
+            if (!account) {
+                console.warn('Skipping Contacts tests: No account configured');
+                return;
+            }
+            const client = getClient(account);
+            const session = await client.fetchSession();
+            if (!session.capabilities['urn:ietf:params:jmap:contacts']) {
+                console.warn('⚠️  Skipping Contacts integration tests: API Token does not support JMAP Contacts capability.');
+                return;
+            }
+
+            // 1. List address books
+            const addressBooksResult = await listAddressBooks();
+            expect(addressBooksResult.addressBooks).toBeDefined();
+            expect(addressBooksResult.addressBooks.length).toBeGreaterThan(0);
+            const defaultAddressBook = addressBooksResult.addressBooks.find(ab => ab.isDefault) || addressBooksResult.addressBooks[0];
+            const addressBookId = defaultAddressBook.id;
+
+            // 2. Create contact
+            const testName = `MCP Test Contact ${Date.now()}`;
+            const createResult = await createContact({
+                addressBookId,
+                fullName: testName,
+                email: 'mcp-test@example.com',
+                phone: '+15551234567',
+                company: 'MCP Org',
+                jobTitle: 'Developer',
+                notes: 'Created via integration tests',
+            });
+            expect(createResult.contact.id).toBeDefined();
+            expect(createResult.contact.fullName).toBe(testName);
+            expect(createResult.contact.email).toBe('mcp-test@example.com');
+            const contactId = createResult.contact.id;
+
+            // 3. Search contact
+            const searchResult = await searchContacts({ text: testName });
+            expect(searchResult.contacts.length).toBeGreaterThan(0);
+            expect(searchResult.contacts.map(c => c.id)).toContain(contactId);
+
+            // 4. Get contact
+            const getResult = await getContact({ ids: [contactId] });
+            expect(getResult.contacts.length).toBe(1);
+            expect(getResult.contacts[0].fullName).toBe(testName);
+
+            // 5. Update contact
+            const updatedName = `${testName} Updated`;
+            const updateResult = await updateContact({
+                id: contactId,
+                fullName: updatedName,
+                email: 'mcp-test-updated@example.com',
+                phone: '+15559876543',
+                company: 'MCP Org Updated',
+                jobTitle: 'Senior Developer',
+                notes: 'Updated via integration tests',
+            });
+            expect(updateResult.success).toBe(true);
+            expect(updateResult.contact.fullName).toBe(updatedName);
+            expect(updateResult.contact.email).toBe('mcp-test-updated@example.com');
+
+            // 6. Delete contact
+            const deleteResult = await deleteContact({ id: contactId });
+            expect(deleteResult.success).toBe(true);
         });
     });
 });
