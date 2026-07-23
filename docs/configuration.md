@@ -14,7 +14,6 @@ Detailed configuration options for Fastmail Courier.
 | `MCP_HTTP_PORT` | No | Port for HTTP transport (default `3333`) |
 | `MCP_HTTP_PATH` | No | Path for MCP endpoint (default `/mcp`) |
 | `MCP_HTTP_ALLOWED_HOSTS` | No | Comma-separated hostnames allowed in Host header (optional) |
-| `MCP_HTTP_STATEFUL` | No | `true` (default) for session tracking, `false` for stateless |
 | `MCP_PUBLIC_URL` | No | Public base URL used for OAuth metadata and UI redirects |
 | `MCP_AUTH_MODE` | No | `oidc`, `proxy`, or `none` (auto-detected if unset) |
 | `MCP_ALLOWED_USERS` | No | Comma-separated allowlist of emails or user IDs |
@@ -36,6 +35,10 @@ Detailed configuration options for Fastmail Courier.
 | `FASTMAIL_VAULT_KEY` | No | 32-byte vault key (base64 or hex) for encrypted storage |
 
 *Required if using environment variables; inferred from token discovery if using config file.
+
+Streamable HTTP requests are handled statelessly. Each request receives an
+isolated MCP server and transport so multiple clients can use the endpoint
+simultaneously.
 
 ## Config File
 
@@ -85,11 +88,16 @@ Location: `~/.config/fastmail-courier/accounts.json`
 }
 ```
 
-Switch accounts at runtime using either display name or email:
+Local stdio clients can switch accounts at runtime using either display name or email:
 ```
 "Switch to Work"
 "Switch to work@company.com"
 ```
+
+For remote stateless HTTP clients, `switch_account` does not overwrite the
+user-wide default and its selection lasts only for the current request. Use the
+setup UI’s **Set as default** option to change the persisted default for future
+requests.
 
 ### Full Account Schema
 
@@ -188,6 +196,8 @@ export FASTMAIL_VAULT_FILE="/data/fastmail-courier/vault.json"
 ```
 
 The key must be 32 bytes (base64 or 64 hex chars). Store it securely (env var or secret manager).
+Vault mutations are serialized per file and committed with atomic renames, so
+simultaneous requests cannot overwrite another user’s update.
 
 ## Security Best Practices
 

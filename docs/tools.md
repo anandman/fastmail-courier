@@ -22,7 +22,10 @@ List all configured Fastmail accounts.
 ---
 
 ### switch_account
-Switch to a different configured account.
+Select a different configured account in the current client context. This does
+not change the user-wide persisted default. In stateless HTTP mode the
+selection lasts only for the current request; use the setup UI to change the
+default used by new requests.
 
 **Parameters:**
 | Name | Type | Required | Description |

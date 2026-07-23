@@ -9,7 +9,7 @@ import { getAccountManager } from '../account-manager.js';
 export const listAccountsSchema = z.object({});
 
 export const switchAccountSchema = z.object({
-    account: z.string().describe('Account to switch to (display name or email). Use this to scope subsequent calls instead of repeating account context.'),
+    account: z.string().describe('Account to select in the current client context (display name or email). This does not change the user-wide persisted default.'),
 });
 
 export const getCurrentAccountSchema = z.object({});
