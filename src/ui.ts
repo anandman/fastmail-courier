@@ -10,6 +10,7 @@ export interface UiAccount {
     displayName?: string;
     caldav?: {
         password: string;
+        username?: string;
     };
 }
 
@@ -258,6 +259,24 @@ const styles = `
     border: 1px solid var(--line);
     border-radius: 14px;
     background: white;
+    text-decoration: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  }
+
+  .account:hover {
+    border-color: #bcc7ea;
+    box-shadow: 0 8px 22px rgba(35, 52, 87, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .account:focus-visible {
+    outline: 3px solid rgba(52, 84, 209, 0.24);
+    outline-offset: 2px;
+  }
+
+  .account.selected {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
   }
 
   .account-main { min-width: 0; }
@@ -286,6 +305,18 @@ const styles = `
     justify-content: flex-end;
     flex-wrap: wrap;
     gap: 6px;
+  }
+
+  .account-actions {
+    display: grid;
+    justify-items: end;
+    gap: 8px;
+  }
+
+  .edit-account {
+    color: var(--brand);
+    font-size: 0.73rem;
+    font-weight: 750;
   }
 
   .badge {
@@ -348,6 +379,22 @@ const styles = `
     margin-bottom: 7px;
     font-size: 0.78rem;
     font-weight: 720;
+  }
+
+  .field-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .field-label label { margin-bottom: 7px; }
+
+  .credential-status {
+    margin-bottom: 7px;
+    color: var(--success);
+    font-size: 0.7rem;
+    font-weight: 750;
   }
 
   .field input[type="email"],
@@ -621,23 +668,35 @@ export function renderNoVaultPage(): string {
     );
 }
 
-export function renderUiPage(user: UiUser, accounts: UiAccount[], defaultAccount: string | null): string {
+export function renderUiPage(
+    user: UiUser,
+    accounts: UiAccount[],
+    defaultAccount: string | null,
+    selectedAccountName: string | null = null
+): string {
+    const selectedAccount =
+        accounts.find((account) => account.name === selectedAccountName) ?? null;
     const accountRows = accounts
         .map((account) => {
             const name = escapeHtml(account.displayName?.trim() || account.name);
             const email = escapeHtml(account.name);
             const isDefault = account.name === defaultAccount;
+            const isSelected = account.name === selectedAccount?.name;
             const caldavEnabled = Boolean(account.caldav?.password);
-            return `<div class="account">
+            const editUrl = `/ui?account=${encodeURIComponent(account.name)}#account-form`;
+            return `<a class="account${isSelected ? ' selected' : ''}" href="${editUrl}" aria-label="Edit ${email}">
               <div class="account-main">
                 <span class="account-name">${name}</span>
                 ${name !== email ? `<span class="account-email">${email}</span>` : ''}
               </div>
-              <div class="badges">
-                ${isDefault ? '<span class="badge default">Default</span>' : ''}
-                <span class="badge">${caldavEnabled ? 'Mail + calendar' : 'Mail only'}</span>
+              <div class="account-actions">
+                <div class="badges">
+                  ${isDefault ? '<span class="badge default">Default</span>' : ''}
+                  <span class="badge">${caldavEnabled ? 'Mail + calendar' : 'Mail only'}</span>
+                </div>
+                <span class="edit-account">${isSelected ? 'Editing' : 'Edit account'}</span>
               </div>
-            </div>`;
+            </a>`;
         })
         .join('');
 
@@ -650,6 +709,13 @@ export function renderUiPage(user: UiUser, accounts: UiAccount[], defaultAccount
         </div>`;
 
     const identity = escapeHtml(user.email?.trim() || 'Authenticated user');
+    const editing = Boolean(selectedAccount);
+    const selectedEmail = escapeHtml(selectedAccount?.name ?? '');
+    const selectedDisplayName = escapeHtml(selectedAccount?.displayName ?? '');
+    const selectedCaldavUsername = escapeHtml(selectedAccount?.caldav?.username ?? '');
+    const selectedIsDefault = selectedAccount?.name === defaultAccount;
+    const hasStoredToken = editing;
+    const hasStoredCaldavPassword = Boolean(selectedAccount?.caldav?.password);
 
     return documentShell(
         'Fastmail Courier Setup',
@@ -689,11 +755,13 @@ export function renderUiPage(user: UiUser, accounts: UiAccount[], defaultAccount
               <div class="account-list">${accountsContent}</div>
             </section>
 
-            <section class="card" aria-labelledby="account-form-heading">
+            <section class="card" id="account-form" aria-labelledby="account-form-heading">
               <div class="card-header">
                 <div>
-                  <h2 id="account-form-heading">Add or update an account</h2>
-                  <p class="card-intro">Use the same email address to update an existing connection.</p>
+                  <h2 id="account-form-heading">${editing ? 'Update account' : 'Add an account'}</h2>
+                  <p class="card-intro">${editing
+                      ? 'Leave either credential blank to keep its current value.'
+                      : 'Connect another Fastmail account to Courier.'}</p>
                 </div>
               </div>
 
@@ -701,33 +769,43 @@ export function renderUiPage(user: UiUser, accounts: UiAccount[], defaultAccount
                 <div class="form-grid">
                   <div class="field">
                     <label for="email">Fastmail email</label>
-                    <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+                    <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" value="${selectedEmail}" ${editing ? 'readonly' : ''} required />
                   </div>
 
                   <div class="field">
                     <label for="displayName">Display name</label>
-                    <input id="displayName" name="displayName" type="text" autocomplete="off" placeholder="Personal" />
+                    <input id="displayName" name="displayName" type="text" autocomplete="off" placeholder="Personal" value="${selectedDisplayName}" />
                   </div>
 
                   <div class="field full">
-                    <label for="token">JMAP API token</label>
-                    <input id="token" name="token" type="password" autocomplete="off" spellcheck="false" />
-                    <span class="hint">Required for a new account. Leave blank to keep the current token when updating.</span>
+                    <div class="field-label">
+                      <label for="token">JMAP API token</label>
+                      ${hasStoredToken ? '<span class="credential-status">Stored securely</span>' : ''}
+                    </div>
+                    <input id="token" name="token" type="password" autocomplete="off" spellcheck="false" placeholder="${hasStoredToken ? '•••••••••••• (stored)' : ''}" />
+                    <span class="hint">${hasStoredToken
+                        ? 'No need to re-enter it. Leave blank to keep the stored token, or enter a replacement.'
+                        : 'Required for a new account.'}</span>
                   </div>
 
                   <div class="field">
-                    <label for="caldavPassword">CalDAV app password</label>
-                    <input id="caldavPassword" name="caldavPassword" type="password" autocomplete="off" spellcheck="false" />
-                    <span class="hint">Optional. Enables calendars and tasks.</span>
+                    <div class="field-label">
+                      <label for="caldavPassword">CalDAV app password</label>
+                      ${hasStoredCaldavPassword ? '<span class="credential-status">Stored securely</span>' : ''}
+                    </div>
+                    <input id="caldavPassword" name="caldavPassword" type="password" autocomplete="off" spellcheck="false" placeholder="${hasStoredCaldavPassword ? '•••••••••••• (stored)' : ''}" />
+                    <span class="hint">${hasStoredCaldavPassword
+                        ? 'Leave blank to keep the stored password, or enter a replacement.'
+                        : 'Optional. Enables calendars and tasks.'}</span>
                   </div>
 
                   <div class="field">
                     <label for="caldavUsername">CalDAV username</label>
-                    <input id="caldavUsername" name="caldavUsername" type="text" autocomplete="username" placeholder="Defaults to email" />
+                    <input id="caldavUsername" name="caldavUsername" type="text" autocomplete="username" placeholder="Defaults to email" value="${selectedCaldavUsername}" />
                   </div>
 
                   <div class="checkbox-row">
-                    <input id="setDefault" name="setDefault" type="checkbox" />
+                    <input id="setDefault" name="setDefault" type="checkbox" ${selectedIsDefault ? 'checked' : ''} />
                     <div class="checkbox-copy">
                       <label for="setDefault">Use as the default account</label>
                       <span>New MCP requests will use this account unless a client selects another one.</span>
@@ -738,8 +816,9 @@ export function renderUiPage(user: UiUser, accounts: UiAccount[], defaultAccount
                 <div class="actions">
                   <button class="button primary" type="submit">
                     ${checkIcon}
-                    Save account
+                    ${editing ? 'Update account' : 'Add account'}
                   </button>
+                  ${editing ? '<a class="button secondary" href="/ui">Cancel</a>' : ''}
                   <span class="hint">Secrets are encrypted before they are written to disk.</span>
                 </div>
               </form>

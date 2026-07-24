@@ -40,6 +40,11 @@ Streamable HTTP requests are handled statelessly. Each request receives an
 isolated MCP server and transport so multiple clients can use the endpoint
 simultaneously.
 
+The setup UI always sends `prompt=login` when starting OIDC authorization.
+Signing out clears Courier's local UI session and returns to a non-cacheable
+login page. This makes identity selection interactive without relying on a
+provider-specific logout endpoint.
+
 ## Config File
 
 Location: `~/.config/fastmail-courier/accounts.json`

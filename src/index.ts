@@ -79,6 +79,9 @@ function setCookie(
     const parts = [`${name}=${encodeURIComponent(value)}`];
     if (options.maxAge !== undefined) {
         parts.push(`Max-Age=${options.maxAge}`);
+        if (options.maxAge === 0) {
+            parts.push('Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+        }
     }
     parts.push(`Path=${options.path ?? '/'}`);
     if (options.httpOnly) {
@@ -124,6 +127,16 @@ async function startHttpServer() {
     const app = createMcpExpressApp({ host, allowedHosts });
 
     app.use(express.urlencoded({ extended: false }));
+    app.use((req, res, next) => {
+        if (req.path === '/ui' || req.path.startsWith('/auth/')) {
+            res.set({
+                'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate',
+                Pragma: 'no-cache',
+                Expires: '0',
+            });
+        }
+        next();
+    });
 
     let oidcProviderConfig: Awaited<ReturnType<typeof loadOidcProviderConfig>> | null = null;
     let oidcUiConfig: ReturnType<typeof loadOidcUiConfig> | null = null;
@@ -164,7 +177,11 @@ async function startHttpServer() {
               })
             : null;
 
-    app.get('/auth/login', async (req, res) => {
+    app.get('/', (_req, res) => {
+        res.redirect('/ui');
+    });
+
+    app.get('/auth/login', async (_req, res) => {
         if (authMode !== 'oidc' || !oidcProviderConfig || !oidcUiConfig) {
             res.status(404).send('OIDC not configured');
             return;
@@ -182,6 +199,7 @@ async function startHttpServer() {
         authorizeUrl.searchParams.set('state', state);
         authorizeUrl.searchParams.set('code_challenge', codeChallenge);
         authorizeUrl.searchParams.set('code_challenge_method', 'S256');
+        authorizeUrl.searchParams.set('prompt', 'login');
 
         setCookie(res, 'fm_oidc_state', JSON.stringify({ state, codeVerifier }), {
             httpOnly: true,
@@ -277,9 +295,10 @@ async function startHttpServer() {
         res.redirect('/ui');
     });
 
-    app.post('/auth/logout', (req, res) => {
+    app.post('/auth/logout', (_req, res) => {
         setCookie(res, 'fm_session', '', { maxAge: 0, path: '/' });
-        res.redirect('/ui');
+        setCookie(res, 'fm_oidc_state', '', { maxAge: 0, path: '/' });
+        res.redirect(303, '/ui?signed_out=1');
     });
 
     app.get('/ui', async (req, res) => {
@@ -297,7 +316,12 @@ async function startHttpServer() {
         const manager = await createUserAccountManager(uiUser.userId, vault);
         const accounts = manager.getAccounts();
         const defaultAccount = manager.getCurrentAccountName();
-        res.status(200).send(renderUiPage(uiUser, accounts, defaultAccount));
+        const requestedAccount =
+            typeof req.query.account === 'string' ? req.query.account : null;
+        const selectedAccount = accounts.some((account) => account.name === requestedAccount)
+            ? requestedAccount
+            : null;
+        res.status(200).send(renderUiPage(uiUser, accounts, defaultAccount, selectedAccount));
     });
 
     app.post('/ui/account', async (req, res) => {
