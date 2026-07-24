@@ -22,6 +22,7 @@ import { createMcpServer } from './mcp-server.js';
 import { createVaultStore } from './vault/index.js';
 import { runWithRequestContext } from './request-context.js';
 import { createUserAccountManager } from './user-accounts.js';
+import { renderLoginPage, renderNoVaultPage, renderUiPage } from './ui.js';
 
 // Main function
 function parsePort(value: string | undefined, fallback: number): number {
@@ -296,7 +297,7 @@ async function startHttpServer() {
         const manager = await createUserAccountManager(uiUser.userId, vault);
         const accounts = manager.getAccounts();
         const defaultAccount = manager.getCurrentAccountName();
-        res.status(200).send(renderUiPage(uiUser.userId, accounts, defaultAccount));
+        res.status(200).send(renderUiPage(uiUser, accounts, defaultAccount));
     });
 
     app.post('/ui/account', async (req, res) => {
@@ -470,77 +471,4 @@ function resolveUiUser(req: express.Request, authMode: 'oidc' | 'proxy' | 'none'
     }
 
     return { userId: 'local' };
-}
-
-function renderLoginPage(authMode: 'oidc' | 'proxy' | 'none') {
-    if (authMode === 'proxy') {
-        return `<!doctype html>
-<html>
-  <body>
-    <h2>Fastmail Courier Setup</h2>
-    <p>Missing authentication headers from proxy.</p>
-  </body>
-</html>`;
-    }
-
-    if (authMode === 'oidc') {
-        return `<!doctype html>
-<html>
-  <body>
-    <h2>Fastmail Courier Setup</h2>
-    <a href="/auth/login">Login with OIDC</a>
-  </body>
-</html>`;
-    }
-
-    return `<!doctype html>
-<html>
-  <body>
-    <h2>Fastmail Courier Setup</h2>
-    <p>No authentication configured.</p>
-  </body>
-</html>`;
-}
-
-function renderNoVaultPage() {
-    return `<!doctype html>
-<html>
-  <body>
-    <h2>Fastmail Courier Setup</h2>
-    <p>Vault storage is not configured. Set FASTMAIL_VAULT_KEY to enable encrypted storage.</p>
-  </body>
-</html>`;
-}
-
-function renderUiPage(userId: string, accounts: Array<{ name: string; displayName?: string; caldav?: { password: string } }>, defaultAccount: string | null) {
-    const rows = accounts
-        .map((account) => {
-            const caldavEnabled = account.caldav?.password ? 'Yes' : 'No';
-            const isDefault = account.name === defaultAccount ? ' (default)' : '';
-            return `<li>${account.displayName ?? account.name}${isDefault} — CalDAV: ${caldavEnabled}</li>`;
-        })
-        .join('');
-
-    return `<!doctype html>
-<html>
-  <body>
-    <h2>Fastmail Courier Setup</h2>
-    <p>Signed in as ${userId}</p>
-    <h3>Accounts</h3>
-    <ul>${rows || '<li>No accounts configured yet.</li>'}</ul>
-    <h3>Add or Update Account</h3>
-    <form method="post" action="/ui/account">
-      <label>Email <input name="email" required /></label><br/>
-      <label>Display Name <input name="displayName" /></label><br/>
-      <label>JMAP API Token <input name="token" /></label><br/>
-      <label>CalDAV App Password <input name="caldavPassword" /></label><br/>
-      <label>CalDAV Username <input name="caldavUsername" /></label><br/>
-      <label>Set as Default <input name="setDefault" type="checkbox" /></label><br/>
-      <button type="submit">Save</button>
-    </form>
-    <form method="post" action="/auth/logout">
-      <button type="submit">Logout</button>
-    </form>
-  </body>
-</html>`;
 }
