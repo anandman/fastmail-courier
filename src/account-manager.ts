@@ -56,6 +56,7 @@ export interface AccountManagerOptions {
 export class AccountManager {
     private accounts: Map<string, ExtendedAccountConfig> = new Map();
     private currentAccountName: string | null = null;
+    private defaultAccountName: string | null = null;
     /** CalDAV password from environment variable (shared across accounts) */
     private envCalDAVPassword: string | null = null;
     private onChange?: (config: ExtendedMultiAccountConfig) => void;
@@ -109,6 +110,7 @@ export class AccountManager {
 
                 this.accounts.set(name, extendedConfig);
                 this.currentAccountName = name;
+                this.defaultAccountName = name;
             }
         }
 
@@ -149,6 +151,8 @@ export class AccountManager {
 
     private applyConfig(config: ExtendedMultiAccountConfig): void {
         this.accounts.clear();
+        this.currentAccountName = null;
+        this.defaultAccountName = null;
         for (const account of config.accounts) {
             const accountConfig: ExtendedAccountConfig = {
                 ...account,
@@ -165,8 +169,10 @@ export class AccountManager {
 
         if (config.defaultAccount) {
             this.currentAccountName = config.defaultAccount;
+            this.defaultAccountName = config.defaultAccount;
         } else if (config.accounts.length > 0) {
             this.currentAccountName = config.accounts[0].name;
+            this.defaultAccountName = config.accounts[0].name;
         }
     }
 
@@ -210,23 +216,22 @@ export class AccountManager {
      * Switch to a different account by display name or email
      */
     switchAccount(identifier: string): boolean {
-        // First try exact match on account key (email)
-        if (this.accounts.has(identifier)) {
-            this.currentAccountName = identifier;
-            this.persist();
-            return true;
-        }
+        const accountName = this.resolveAccountName(identifier);
+        if (!accountName) return false;
+        this.currentAccountName = accountName;
+        return true;
+    }
 
-        // Try matching by displayName
-        for (const [email, account] of this.accounts.entries()) {
-            if (account.displayName?.toLowerCase() === identifier.toLowerCase()) {
-                this.currentAccountName = email;
-                this.persist();
-                return true;
-            }
-        }
-
-        return false;
+    /**
+     * Set the persisted default account used by newly created managers.
+     */
+    setDefaultAccount(identifier: string): boolean {
+        const accountName = this.resolveAccountName(identifier);
+        if (!accountName) return false;
+        this.currentAccountName = accountName;
+        this.defaultAccountName = accountName;
+        this.persist();
+        return true;
     }
 
     /**
@@ -241,6 +246,9 @@ export class AccountManager {
         // If this is the first account, make it current
         if (!this.currentAccountName) {
             this.currentAccountName = config.name;
+        }
+        if (!this.defaultAccountName) {
+            this.defaultAccountName = config.name;
         }
 
         this.persist();
@@ -270,8 +278,22 @@ export class AccountManager {
     exportConfig(): ExtendedMultiAccountConfig {
         return {
             accounts: this.getAccounts(),
-            defaultAccount: this.currentAccountName ?? '',
+            defaultAccount: this.defaultAccountName ?? '',
         };
+    }
+
+    private resolveAccountName(identifier: string): string | null {
+        if (this.accounts.has(identifier)) {
+            return identifier;
+        }
+
+        for (const [email, account] of this.accounts.entries()) {
+            if (account.displayName?.toLowerCase() === identifier.toLowerCase()) {
+                return email;
+            }
+        }
+
+        return null;
     }
 
     /**

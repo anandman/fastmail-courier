@@ -14,8 +14,5 @@ export async function createUserAccountManager(userId: string, vault: VaultStore
         initialConfig,
         allowEnv: false,
         allowConfigFile: false,
-        onChange: (config) => {
-            void vault.setUserConfig(userId, config);
-        },
     });
 }

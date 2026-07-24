@@ -6,84 +6,23 @@
  * Works with Claude CLI, Gemini CLI, and other MCP-compatible clients.
  */
 
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { createHash, randomBytes } from 'node:crypto';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { mcpAuthMetadataRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
-import {
-    CallToolRequestSchema,
-    ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
 import express from 'express';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 
-import { tools } from './tools/index.js';
 import { createOidcVerifier, loadOidcProviderConfig, loadOidcUiConfig, parseAllowedUsers, verifyIdToken } from './auth/oidc.js';
 import { createProxyAuthMiddleware } from './auth/proxy.js';
 import { signSession, verifySession } from './auth/session.js';
+import { AccountManager } from './account-manager.js';
+import { handleStatelessMcpRequest } from './http-transport.js';
+import { createMcpServer } from './mcp-server.js';
 import { createVaultStore } from './vault/index.js';
 import { runWithRequestContext } from './request-context.js';
 import { createUserAccountManager } from './user-accounts.js';
-
-// Create server instance
-const server = new Server(
-    {
-        name: 'fastmail-courier',
-        version: '1.0.0',
-    },
-    {
-        capabilities: {
-            tools: {},
-        },
-    }
-);
-
-// List tools handler
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return {
-        tools: tools.map((tool) => ({
-            name: tool.name,
-            description: tool.description,
-            inputSchema: zodToJsonSchema(tool.inputSchema),
-        })),
-    };
-});
-
-// Call tool handler
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
-
-    const tool = tools.find((t) => t.name === name);
-    if (!tool) {
-        throw new Error(`Unknown tool: ${name}`);
-    }
-
-    try {
-        const result = await tool.handler(args || {});
-        return {
-            content: [
-                {
-                    type: 'text',
-                    text: JSON.stringify(result, null, 2),
-                },
-            ],
-        };
-    } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return {
-            content: [
-                {
-                    type: 'text',
-                    text: JSON.stringify({ error: message }, null, 2),
-                },
-            ],
-            isError: true,
-        };
-    }
-});
+import { renderLoginPage, renderNoVaultPage, renderUiPage } from './ui.js';
 
 // Main function
 function parsePort(value: string | undefined, fallback: number): number {
@@ -165,6 +104,7 @@ function setCookie(
 }
 
 async function startStdioServer() {
+    const server = createMcpServer();
     const transport = new StdioServerTransport();
     await server.connect(transport);
 }
@@ -174,19 +114,12 @@ async function startHttpServer() {
     const port = parsePort(process.env.MCP_HTTP_PORT, 3333);
     const path = normalizePath(process.env.MCP_HTTP_PATH);
     const allowedHosts = parseAllowedHosts(process.env.MCP_HTTP_ALLOWED_HOSTS);
-    const stateful = (process.env.MCP_HTTP_STATEFUL ?? 'true').toLowerCase() !== 'false';
     const authMode = parseAuthMode();
     const publicUrlValue = process.env.MCP_PUBLIC_URL ?? `http://${host}:${port}`;
     const publicUrl = new URL(publicUrlValue.endsWith('/') ? publicUrlValue.slice(0, -1) : publicUrlValue);
     const resourceServerUrl = new URL(path, publicUrl);
 
     const vault = authMode === 'none' ? null : createVaultStore();
-
-    const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: stateful ? () => randomUUID() : undefined,
-    });
-
-    await server.connect(transport);
 
     const app = createMcpExpressApp({ host, allowedHosts });
 
@@ -364,7 +297,7 @@ async function startHttpServer() {
         const manager = await createUserAccountManager(uiUser.userId, vault);
         const accounts = manager.getAccounts();
         const defaultAccount = manager.getCurrentAccountName();
-        res.status(200).send(renderUiPage(uiUser.userId, accounts, defaultAccount));
+        res.status(200).send(renderUiPage(uiUser, accounts, defaultAccount));
     });
 
     app.post('/ui/account', async (req, res) => {
@@ -400,24 +333,39 @@ async function startHttpServer() {
             return;
         }
 
-        const nextConfig = {
-            name: email,
-            token: resolvedToken,
-            displayName: displayName || existing?.displayName,
-            sessionUrl: existing?.sessionUrl ?? 'https://api.fastmail.com/jmap/session',
-            caldav: caldavPassword || existing?.caldav?.password
-                ? {
-                      password: caldavPassword || existing?.caldav?.password || '',
-                      username: caldavUsername || existing?.caldav?.username || email,
-                      serverUrl: existing?.caldav?.serverUrl ?? 'https://caldav.fastmail.com',
-                  }
-                : undefined,
-        };
+        await vault.updateUserConfig(uiUser.userId, (latestConfig) => {
+            const latestManager = new AccountManager({
+                initialConfig: latestConfig ?? { accounts: [], defaultAccount: '' },
+                allowEnv: false,
+                allowConfigFile: false,
+            });
+            const latestExisting = latestManager
+                .getAccounts()
+                .find((account) => account.name === email);
+            const latestToken = token || latestExisting?.token || resolvedToken;
 
-        manager.addAccount(nextConfig);
-        if (setDefault) {
-            manager.switchAccount(email);
-        }
+            latestManager.addAccount({
+                name: email,
+                token: latestToken,
+                displayName: displayName || latestExisting?.displayName,
+                sessionUrl:
+                    latestExisting?.sessionUrl ?? 'https://api.fastmail.com/jmap/session',
+                caldav: caldavPassword || latestExisting?.caldav?.password
+                    ? {
+                          password: caldavPassword || latestExisting?.caldav?.password || '',
+                          username:
+                              caldavUsername || latestExisting?.caldav?.username || email,
+                          serverUrl:
+                              latestExisting?.caldav?.serverUrl ??
+                              'https://caldav.fastmail.com',
+                      }
+                    : undefined,
+            });
+            if (setDefault) {
+                latestManager.setDefaultAccount(email);
+            }
+            return latestManager.exportConfig();
+        });
 
         res.redirect('/ui');
     });
@@ -438,7 +386,7 @@ async function startHttpServer() {
 
             const accountManager = userId && vault ? await createUserAccountManager(userId, vault) : undefined;
             await runWithRequestContext({ accountManager, authInfo, userId: userId ?? undefined }, async () => {
-                await transport.handleRequest(req, res, req.body);
+                await handleStatelessMcpRequest(req, res);
             });
         } catch (error) {
             if (res.headersSent) {
@@ -523,77 +471,4 @@ function resolveUiUser(req: express.Request, authMode: 'oidc' | 'proxy' | 'none'
     }
 
     return { userId: 'local' };
-}
-
-function renderLoginPage(authMode: 'oidc' | 'proxy' | 'none') {
-    if (authMode === 'proxy') {
-        return `<!doctype html>
-<html>
-  <body>
-    <h2>Fastmail Courier Setup</h2>
-    <p>Missing authentication headers from proxy.</p>
-  </body>
-</html>`;
-    }
-
-    if (authMode === 'oidc') {
-        return `<!doctype html>
-<html>
-  <body>
-    <h2>Fastmail Courier Setup</h2>
-    <a href="/auth/login">Login with OIDC</a>
-  </body>
-</html>`;
-    }
-
-    return `<!doctype html>
-<html>
-  <body>
-    <h2>Fastmail Courier Setup</h2>
-    <p>No authentication configured.</p>
-  </body>
-</html>`;
-}
-
-function renderNoVaultPage() {
-    return `<!doctype html>
-<html>
-  <body>
-    <h2>Fastmail Courier Setup</h2>
-    <p>Vault storage is not configured. Set FASTMAIL_VAULT_KEY to enable encrypted storage.</p>
-  </body>
-</html>`;
-}
-
-function renderUiPage(userId: string, accounts: Array<{ name: string; displayName?: string; caldav?: { password: string } }>, defaultAccount: string | null) {
-    const rows = accounts
-        .map((account) => {
-            const caldavEnabled = account.caldav?.password ? 'Yes' : 'No';
-            const isDefault = account.name === defaultAccount ? ' (default)' : '';
-            return `<li>${account.displayName ?? account.name}${isDefault} — CalDAV: ${caldavEnabled}</li>`;
-        })
-        .join('');
-
-    return `<!doctype html>
-<html>
-  <body>
-    <h2>Fastmail Courier Setup</h2>
-    <p>Signed in as ${userId}</p>
-    <h3>Accounts</h3>
-    <ul>${rows || '<li>No accounts configured yet.</li>'}</ul>
-    <h3>Add or Update Account</h3>
-    <form method="post" action="/ui/account">
-      <label>Email <input name="email" required /></label><br/>
-      <label>Display Name <input name="displayName" /></label><br/>
-      <label>JMAP API Token <input name="token" /></label><br/>
-      <label>CalDAV App Password <input name="caldavPassword" /></label><br/>
-      <label>CalDAV Username <input name="caldavUsername" /></label><br/>
-      <label>Set as Default <input name="setDefault" type="checkbox" /></label><br/>
-      <button type="submit">Save</button>
-    </form>
-    <form method="post" action="/auth/logout">
-      <button type="submit">Logout</button>
-    </form>
-  </body>
-</html>`;
 }
