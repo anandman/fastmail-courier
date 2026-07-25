@@ -12,6 +12,11 @@ Most email tools are designed to minimize tokens if used in the right order:
 
 ## Account Management
 
+Every email, mailbox, contact, calendar, and task tool accepts an optional
+`account` parameter. Pass a configured display name or email to target that
+account for one call; omit it to use the persisted default. This is the
+recommended selection mechanism for stateless HTTP clients.
+
 ### list_accounts
 List all configured Fastmail accounts.
 
@@ -24,8 +29,9 @@ List all configured Fastmail accounts.
 ### switch_account
 Select a different configured account in the current client context. This does
 not change the user-wide persisted default. In stateless HTTP mode the
-selection lasts only for the current request; use the setup UI to change the
-default used by new requests.
+selection ends with the `switch_account` request, so pass `account` directly to
+the target tool instead. Use the setup UI to change the default used by new
+requests.
 
 **Parameters:**
 | Name | Type | Required | Description |

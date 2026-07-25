@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod';
+import { getAccountManager } from '../account-manager.js';
 
 // Account tools
 import {
@@ -117,8 +118,56 @@ export interface ToolDefinition {
     handler: (params: unknown) => Promise<unknown>;
 }
 
-// All tools
-export const tools: ToolDefinition[] = [
+const accountSelectorSchema = z.string()
+    .min(1)
+    .optional()
+    .describe(
+        'Fastmail account to use for this call (display name or email). Defaults to the configured default account.'
+    );
+
+const accountSelectionSchema = z.object({
+    account: accountSelectorSchema,
+});
+
+const ACCOUNT_SCOPED_DESCRIPTION =
+    'Use the optional account parameter to target a configured account by display name or email for this call.';
+
+export function createAccountScopedTool(tool: ToolDefinition): ToolDefinition {
+    if (!(tool.inputSchema instanceof z.ZodObject)) {
+        throw new Error(`Account-scoped tool "${tool.name}" must use a Zod object schema`);
+    }
+
+    const inputSchema = tool.inputSchema.extend({
+        account: accountSelectorSchema,
+    });
+
+    return {
+        ...tool,
+        description: `${tool.description} ${ACCOUNT_SCOPED_DESCRIPTION}`,
+        inputSchema,
+        handler: async (params) => {
+            const parsed = inputSchema.parse(params);
+            const { account } = accountSelectionSchema.parse(parsed);
+
+            if (account) {
+                const manager = getAccountManager();
+                if (!manager.switchAccount(account)) {
+                    const available = manager
+                        .getAccounts()
+                        .map((candidate) => candidate.displayName || candidate.name);
+                    throw new Error(
+                        `Account "${account}" not found. Available: ${available.join(', ') || 'none configured'}`
+                    );
+                }
+            }
+
+            return tool.handler(parsed);
+        },
+    };
+}
+
+// All tools before account-scoped decoration
+const baseTools: ToolDefinition[] = [
     // Account Management
     {
         name: 'list_accounts',
@@ -128,7 +177,8 @@ export const tools: ToolDefinition[] = [
     },
     {
         name: 'switch_account',
-        description: 'Switch to a different Fastmail account (cheap; do this before other calls).',
+        description:
+            'Select a Fastmail account in the current client context. In stateless HTTP, pass account directly to the target tool instead.',
         inputSchema: switchAccountSchema,
         handler: (params) => switchAccount(switchAccountSchema.parse(params)),
     },
@@ -351,6 +401,16 @@ export const tools: ToolDefinition[] = [
         handler: (params) => deleteEvent(deleteEventSchema.parse(params)),
     },
 ];
+
+const accountManagementTools = new Set([
+    'list_accounts',
+    'switch_account',
+    'get_current_account',
+]);
+
+export const tools: ToolDefinition[] = baseTools.map((tool) =>
+    accountManagementTools.has(tool.name) ? tool : createAccountScopedTool(tool)
+);
 
 // Export individual tools for testing
 export {

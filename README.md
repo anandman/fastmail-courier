@@ -71,6 +71,10 @@ For calendar/tasks, you'll also need an app password. See [Getting Started](docs
 | **Calendar** | `list_calendars`, `list_events`, `get_event`, `create_event`, `update_event`, `delete_event` |
 | **Tasks** | `list_tasks`, `get_task`, `create_task`, `update_task`, `complete_task`, `delete_task` |
 
+All email, mailbox, contact, calendar, and task tools accept an optional
+`account` display name or email. Use it to target a non-default account for one
+stateless HTTP call without changing the persisted default.
+
 ## Documentation
 
 - [Getting Started](docs/getting-started.md) - Full setup guide

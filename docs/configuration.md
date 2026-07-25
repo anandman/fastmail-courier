@@ -99,10 +99,23 @@ Local stdio clients can switch accounts at runtime using either display name or 
 "Switch to work@company.com"
 ```
 
-For remote stateless HTTP clients, `switch_account` does not overwrite the
-user-wide default and its selection lasts only for the current request. Use the
-setup UI’s **Set as default** option to change the persisted default for future
-requests.
+For remote stateless HTTP clients, pass the optional `account` parameter
+directly to any email, mailbox, contact, calendar, or task tool:
+
+```json
+{
+  "account": "Work",
+  "startAfter": "2026-07-24T00:00:00-07:00",
+  "startBefore": "2026-07-25T00:00:00-07:00",
+  "limit": 20
+}
+```
+
+The selector accepts a display name or email and affects only that tool call.
+If omitted, Courier uses the persisted default. `switch_account` remains useful
+for stateful local clients, but its selection lasts only for its own request in
+stateless HTTP mode. Use the setup UI’s **Set as default** option only when the
+persisted default for future requests should change.
 
 ### Full Account Schema
 
