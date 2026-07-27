@@ -86,7 +86,11 @@ export async function verifyIdToken(token: string, config: OidcProviderConfig, c
     }
     const jwks = createRemoteJWKSet(new URL(config.jwksUri));
     const { payload } = await jwtVerify(token, jwks, {
-        issuer: config.issuerUrl.href,
+        // Compare against the issuer the provider advertises, never a URL-parsed
+        // form of the configured value: `new URL()` appends a trailing slash to
+        // an origin, and Google's `iss` is "https://accounts.google.com" with
+        // none, so normalising here fails every token it issues.
+        issuer: config.metadata.issuer,
         audience: clientId,
     });
     return payload as Record<string, unknown>;

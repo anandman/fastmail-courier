@@ -153,6 +153,13 @@ async function startHttpServer() {
 
     const app = createMcpExpressApp({ host, allowedHosts });
 
+    // Tailscale Funnel proxies from loopback and forwards the caller in
+    // X-Forwarded-For. Without this, express-rate-limit sees every public
+    // request as coming from 127.0.0.1 and buckets all callers together, so one
+    // busy client could rate-limit everyone else. Trusting only the loopback hop
+    // keeps a remote caller from spoofing the header to escape its own bucket.
+    app.set('trust proxy', 'loopback');
+
     app.use(express.urlencoded({ extended: false }));
 
     // Opt-in access log. Courier sits behind Tailscale Funnel, which keeps no

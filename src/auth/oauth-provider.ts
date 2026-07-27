@@ -132,7 +132,13 @@ export class CourierOAuthProvider implements OAuthServerProvider {
             const resolved = this.resolveUser(claims);
             userId = resolved.userId;
             email = resolved.email;
-        } catch {
+        } catch (error) {
+            // The user only ever sees a generic access_denied, so without this
+            // the actual cause is unrecoverable after the fact.
+            console.error(
+                '[auth] upstream identity verification failed:',
+                error instanceof Error ? error.message : String(error)
+            );
             redirectWithError(res, pending, 'access_denied', 'Could not verify your identity with the sign-in provider');
             return;
         }
