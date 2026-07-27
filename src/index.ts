@@ -11,7 +11,11 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
+import {
+    mcpAuthRouter,
+    createOAuthMetadata,
+    getOAuthProtectedResourceMetadataUrl,
+} from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 import express from 'express';
 
@@ -251,6 +255,33 @@ async function startHttpServer() {
         app.get('/auth/mcp/callback', (req, res, next) => {
             provider.handleUpstreamCallback(req, res).catch(next);
         });
+
+        // RFC 8414 puts authorization server metadata at the bare well-known
+        // path for an issuer with no path component, and that is where the SDK
+        // router serves it. But clients differ: some probe the path-suffixed
+        // form first, and some try OIDC discovery, neither of which the SDK
+        // mounts. Both then 404. Serving the same document at those paths costs
+        // nothing and removes a whole class of discovery failure.
+        //
+        // Only the OAuth fields are published — Courier issues no id_token and
+        // has no userinfo endpoint, so this is not a claim of OIDC support.
+        const oauthMetadata = createOAuthMetadata({
+            provider,
+            issuerUrl: publicUrl,
+            baseUrl: publicUrl,
+            serviceDocumentationUrl,
+        });
+        const serveAuthorizationServerMetadata: express.RequestHandler = (_req, res) => {
+            res.set('Access-Control-Allow-Origin', '*');
+            res.json(oauthMetadata);
+        };
+        for (const alias of [
+            `/.well-known/oauth-authorization-server${path}`,
+            '/.well-known/openid-configuration',
+            `/.well-known/openid-configuration${path}`,
+        ]) {
+            app.get(alias, serveAuthorizationServerMetadata);
+        }
 
         // The SDK router only mounts the path-suffixed PRM document required by
         // RFC 9728. Clients that fall back to probing the bare well-known path
