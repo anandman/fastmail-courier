@@ -154,6 +154,25 @@ async function startHttpServer() {
     const app = createMcpExpressApp({ host, allowedHosts });
 
     app.use(express.urlencoded({ extended: false }));
+
+    // Opt-in access log. Courier sits behind Tailscale Funnel, which keeps no
+    // request log of its own, so without this there is no way to tell whether a
+    // failing client ever reached the server. Method, path, status and source
+    // only — never headers, since Authorization would land in the journal.
+    if (process.env.MCP_ACCESS_LOG === '1' || process.env.MCP_ACCESS_LOG === 'true') {
+        app.use((req, res, next) => {
+            const startedAt = Date.now();
+            res.once('finish', () => {
+                const forwarded = getHeaderValue(req.headers['x-forwarded-for']);
+                const source = forwarded ?? req.socket.remoteAddress ?? '-';
+                console.log(
+                    `[access] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${Date.now() - startedAt}ms src=${source}`
+                );
+            });
+            next();
+        });
+    }
+
     app.use((req, res, next) => {
         if (req.path === '/ui' || req.path.startsWith('/auth/')) {
             res.set({
@@ -574,4 +593,9 @@ function resolveUiUser(req: express.Request, authMode: 'oidc' | 'proxy' | 'none'
     }
 
     return { userId: 'local' };
+}
+
+function getHeaderValue(value: string | string[] | undefined): string | undefined {
+    if (!value) return undefined;
+    return Array.isArray(value) ? value[0] : value;
 }
