@@ -4,7 +4,7 @@
  * and each failure below would be an auth bypass.
  */
 
-import { existsSync } from 'node:fs';
+
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -102,22 +102,22 @@ function seedCode(
 }
 
 describe('CourierClientStore', () => {
-    it('keeps new registrations in memory and never writes to disk', async () => {
+    it('records a provisional registration with an expiry', async () => {
         const store = new CourierClientStore({ filePath: clientsFile });
-        await store.registerClient({ ...client('c1'), redirect_uris: ['https://a.example/cb'] } as never);
+        await store.registerClient(client('c1') as never);
 
         expect(await store.getClient('c1')).toBeDefined();
-        expect(existsSync(clientsFile)).toBe(false);
+        const data = JSON.parse(await readFile(clientsFile, 'utf8'));
+        expect(data.clients.c1.expiresAt).toBeGreaterThan(Date.now());
     });
 
-    it('persists a client only once it is promoted', async () => {
+    it('makes a client permanent on promotion', async () => {
         const store = new CourierClientStore({ filePath: clientsFile });
         await store.registerClient(client('c1') as never);
         await store.promoteClient('c1');
 
-        expect(existsSync(clientsFile)).toBe(true);
         const data = JSON.parse(await readFile(clientsFile, 'utf8'));
-        expect(Object.keys(data.clients)).toEqual(['c1']);
+        expect(data.clients.c1.expiresAt).toBeNull();
     });
 
     it('expires provisional registrations', async () => {
@@ -127,7 +127,15 @@ describe('CourierClientStore', () => {
         expect(await store.getClient('c1')).toBeUndefined();
     });
 
-    it('evicts the oldest entry instead of growing without bound', async () => {
+    it('never expires a promoted client', async () => {
+        const store = new CourierClientStore({ filePath: clientsFile, provisionalTtlMs: -1 });
+        await store.registerClient(client('c1') as never);
+        await store.promoteClient('c1');
+
+        expect(await store.getClient('c1')).toBeDefined();
+    });
+
+    it('evicts the oldest provisional entry instead of growing without bound', async () => {
         const store = new CourierClientStore({ filePath: clientsFile, maxProvisional: 2 });
         await store.registerClient(client('c1') as never);
         await store.registerClient(client('c2') as never);
@@ -137,13 +145,35 @@ describe('CourierClientStore', () => {
         expect(await store.getClient('c3')).toBeDefined();
     });
 
-    it('survives a reload from disk', async () => {
+    it('will not let a flood of registrations evict a promoted client', async () => {
+        const store = new CourierClientStore({ filePath: clientsFile, maxProvisional: 2 });
+        await store.registerClient(client('keeper') as never);
+        await store.promoteClient('keeper');
+
+        for (let i = 0; i < 20; i += 1) {
+            await store.registerClient(client(`flood-${i}`) as never);
+        }
+
+        expect(await store.getClient('keeper')).toBeDefined();
+    });
+
+    // A client caches the client_id it was issued and will not re-register when
+    // the server stops recognising it, so a restart mid-setup must not orphan it.
+    it('survives a restart before the client is promoted', async () => {
+        const first = new CourierClientStore({ filePath: clientsFile });
+        await first.registerClient(client('c1') as never);
+
+        const afterRestart = new CourierClientStore({ filePath: clientsFile });
+        expect(await afterRestart.getClient('c1')).toBeDefined();
+    });
+
+    it('survives a restart after promotion', async () => {
         const first = new CourierClientStore({ filePath: clientsFile });
         await first.registerClient(client('c1') as never);
         await first.promoteClient('c1');
 
-        const second = new CourierClientStore({ filePath: clientsFile });
-        expect(await second.getClient('c1')).toBeDefined();
+        const afterRestart = new CourierClientStore({ filePath: clientsFile });
+        expect(await afterRestart.getClient('c1')).toBeDefined();
     });
 });
 
@@ -226,7 +256,8 @@ describe('authorization code bindings', () => {
         const tokens = await provider.exchangeAuthorizationCode(client('client-a') as never, 'code-1');
 
         expect(tokens.access_token).toBeTruthy();
-        expect(existsSync(clientsFile)).toBe(true);
+        const data = JSON.parse(await readFile(clientsFile, 'utf8'));
+        expect(data.clients['client-a'].expiresAt).toBeNull();
     });
 });
 

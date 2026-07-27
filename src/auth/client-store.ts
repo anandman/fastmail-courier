@@ -8,10 +8,17 @@ import type { OAuthClientInformationFull } from '@modelcontextprotocol/sdk/share
  * Two-phase client registry.
  *
  * `POST /register` is unauthenticated by RFC 7591, so anyone on the internet can
- * call it. Registrations therefore start in memory only, bounded by a TTL and a
- * hard cap, and are never written to disk. A client is persisted only once an
- * allowlisted human has completed an authorization with it, which means
- * anonymous traffic cannot cause a disk write no matter how much of it arrives.
+ * call it. New registrations are therefore provisional: they carry a TTL, they
+ * count against a hard cap, and the oldest is evicted once that cap is reached.
+ * A client becomes permanent only once an allowlisted human has completed an
+ * authorization with it, and permanent entries never expire and are never
+ * evicted. Anonymous traffic can consume at most `maxProvisional` slots.
+ *
+ * Provisional entries are persisted rather than held in memory. Clients cache
+ * the `client_id` they were issued and do not re-register when it stops being
+ * recognised, so a restart between registration and first authorization would
+ * otherwise break a client permanently. The cap is what bounds disk use here;
+ * keeping them in memory only bought durability problems, not safety.
  */
 export interface CourierClientStoreOptions {
     filePath: string;
@@ -19,25 +26,25 @@ export interface CourierClientStoreOptions {
     maxProvisional?: number;
 }
 
-interface ProvisionalEntry {
+/** `expiresAt: null` marks a promoted client: permanent, never evicted. */
+interface StoredClient {
     client: OAuthClientInformationFull;
-    expiresAt: number;
+    expiresAt: number | null;
 }
 
 interface ClientFileData {
     version: number;
-    clients: Record<string, OAuthClientInformationFull>;
+    clients: Record<string, StoredClient>;
 }
 
-const DEFAULT_PROVISIONAL_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_PROVISIONAL_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_MAX_PROVISIONAL = 500;
 
 export class CourierClientStore implements OAuthRegisteredClientsStore {
     private readonly filePath: string;
     private readonly provisionalTtlMs: number;
     private readonly maxProvisional: number;
-    private readonly provisional = new Map<string, ProvisionalEntry>();
-    private persisted: Map<string, OAuthClientInformationFull> | null = null;
+    private clients: Map<string, StoredClient> | null = null;
     private writeQueue: Promise<unknown> = Promise.resolve();
 
     constructor(options: CourierClientStoreOptions) {
@@ -47,77 +54,89 @@ export class CourierClientStore implements OAuthRegisteredClientsStore {
     }
 
     async getClient(clientId: string): Promise<OAuthClientInformationFull | undefined> {
-        const persisted = await this.loadPersisted();
-        const stored = persisted.get(clientId);
-        if (stored) return stored;
+        const clients = await this.load();
+        const entry = clients.get(clientId);
+        if (!entry) return undefined;
 
-        this.pruneProvisional();
-        return this.provisional.get(clientId)?.client;
+        if (entry.expiresAt !== null && entry.expiresAt <= Date.now()) {
+            clients.delete(clientId);
+            await this.flush(clients);
+            return undefined;
+        }
+
+        return entry.client;
     }
 
     async registerClient(client: OAuthClientInformationFull): Promise<OAuthClientInformationFull> {
-        this.pruneProvisional();
+        const clients = await this.load();
+        this.pruneExpired(clients);
 
         // Evict the oldest provisional entry rather than rejecting, so a flood
         // degrades into retries for legitimate clients instead of a hard outage.
-        while (this.provisional.size >= this.maxProvisional) {
-            const oldest = this.provisional.keys().next();
-            if (oldest.done) break;
-            this.provisional.delete(oldest.value);
+        // Promoted clients are skipped: a flood must never displace one.
+        while (this.countProvisional(clients) >= this.maxProvisional) {
+            const oldest = [...clients.entries()]
+                .filter(([, entry]) => entry.expiresAt !== null)
+                .sort((a, b) => (a[1].expiresAt ?? 0) - (b[1].expiresAt ?? 0))[0];
+            if (!oldest) break;
+            clients.delete(oldest[0]);
         }
 
         const clientId = client.client_id || randomUUID();
         const registered: OAuthClientInformationFull = { ...client, client_id: clientId };
-        this.provisional.set(clientId, {
-            client: registered,
-            expiresAt: Date.now() + this.provisionalTtlMs,
-        });
+        clients.set(clientId, { client: registered, expiresAt: Date.now() + this.provisionalTtlMs });
+        await this.flush(clients);
 
         return registered;
     }
 
     /**
-     * Moves a client from the in-memory registry to durable storage. Called only
-     * after an allowlisted user has completed an authorization code exchange.
+     * Marks a client permanent. Called only after an allowlisted user has
+     * completed an authorization code exchange with it.
      */
     async promoteClient(clientId: string): Promise<void> {
-        const entry = this.provisional.get(clientId);
-        if (!entry) return;
+        const clients = await this.load();
+        const entry = clients.get(clientId);
+        if (!entry || entry.expiresAt === null) return;
 
-        const persisted = await this.loadPersisted();
-        if (!persisted.has(clientId)) {
-            persisted.set(clientId, entry.client);
-            await this.flush(persisted);
-        }
-        this.provisional.delete(clientId);
+        clients.set(clientId, { ...entry, expiresAt: null });
+        await this.flush(clients);
     }
 
-    private pruneProvisional(): void {
+    private countProvisional(clients: Map<string, StoredClient>): number {
+        let count = 0;
+        for (const entry of clients.values()) {
+            if (entry.expiresAt !== null) count += 1;
+        }
+        return count;
+    }
+
+    private pruneExpired(clients: Map<string, StoredClient>): void {
         const now = Date.now();
-        for (const [clientId, entry] of this.provisional) {
-            if (entry.expiresAt <= now) {
-                this.provisional.delete(clientId);
+        for (const [clientId, entry] of clients) {
+            if (entry.expiresAt !== null && entry.expiresAt <= now) {
+                clients.delete(clientId);
             }
         }
     }
 
-    private async loadPersisted(): Promise<Map<string, OAuthClientInformationFull>> {
-        if (this.persisted) return this.persisted;
+    private async load(): Promise<Map<string, StoredClient>> {
+        if (this.clients) return this.clients;
 
         try {
             const raw = await readFile(this.filePath, 'utf8');
             const data = JSON.parse(raw) as ClientFileData;
-            this.persisted = new Map(Object.entries(data.clients ?? {}));
+            this.clients = new Map(Object.entries(data.clients ?? {}));
         } catch (error) {
             if (isNodeError(error) && error.code !== 'ENOENT') throw error;
-            this.persisted = new Map();
+            this.clients = new Map();
         }
 
-        return this.persisted;
+        return this.clients;
     }
 
-    private async flush(clients: Map<string, OAuthClientInformationFull>): Promise<void> {
-        const data: ClientFileData = { version: 1, clients: Object.fromEntries(clients) };
+    private async flush(clients: Map<string, StoredClient>): Promise<void> {
+        const data: ClientFileData = { version: 2, clients: Object.fromEntries(clients) };
         const write = this.writeQueue.catch(() => undefined).then(() => this.writeFile(data));
         this.writeQueue = write.catch(() => undefined);
         await write;
