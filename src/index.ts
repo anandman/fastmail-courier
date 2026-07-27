@@ -199,7 +199,13 @@ async function startHttpServer() {
         oidcProviderConfig = await loadOidcProviderConfig();
         oidcUiConfig = loadOidcUiConfig();
 
-        const serviceDocumentationUrl = new URL('docs/architecture.md', publicUrl);
+        // Advertised in protected resource metadata as `resource_documentation`.
+        // It previously defaulted to a path on this server that nothing serves,
+        // so clients were pointed at a 404. The field is optional in RFC 9728 —
+        // better to omit it than to publish a dead link.
+        const serviceDocumentationUrl = process.env.MCP_SERVICE_DOCUMENTATION_URL
+            ? new URL(process.env.MCP_SERVICE_DOCUMENTATION_URL)
+            : undefined;
         const upstreamRedirectUri =
             process.env.MCP_OIDC_MCP_REDIRECT_URI ?? new URL('/auth/mcp/callback', publicUrl).href;
 
@@ -253,7 +259,7 @@ async function startHttpServer() {
         const rootProtectedResourceMetadata = {
             resource: resourceServerUrl.href,
             authorization_servers: [publicUrl.href],
-            resource_documentation: serviceDocumentationUrl.href,
+            ...(serviceDocumentationUrl ? { resource_documentation: serviceDocumentationUrl.href } : {}),
         };
         app.get('/.well-known/oauth-protected-resource', (_req, res) => {
             res.set('Access-Control-Allow-Origin', '*');

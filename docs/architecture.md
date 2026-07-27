@@ -63,6 +63,40 @@ Fastmail Courier is an MCP server that bridges AI assistants (Claude, Gemini) wi
 - JMAP uses modern OAuth-style tokens (scoped, revocable)
 - CalDAV uses legacy HTTP Basic Auth (protocol requirement)
 
+## Remote Hosting
+
+Courier runs either as a local stdio process or as a multi-user HTTP service.
+Over HTTP it is **both the MCP resource server and its own OAuth 2.1
+authorization server** — it owns dynamic client registration and issues its own
+access and refresh tokens. An external identity provider authenticates humans
+and does nothing else.
+
+```
+MCP client ──register / authorize / token──► Courier ──► per-user encrypted vault
+                                               │
+       user's browser ──sign in──────────────► └──► identity provider (OIDC)
+```
+
+Two consequences worth understanding:
+
+- The identity provider is reached **only from the user's browser**, never from
+  a client's network. Per-tenant client caps and network filtering in front of
+  the provider therefore cannot break a connection.
+- Nothing about any particular client or provider is encoded in the server. Any
+  client that speaks MCP OAuth works with no configuration; the provider is one
+  environment variable.
+
+Fastmail credentials are never held by a client. Each user adds their own via
+`/ui`, and they are stored encrypted per-user in the vault, keyed by the
+identity claim chosen with `MCP_USER_ID_CLAIM`.
+
+Access is gated by `MCP_ALLOWED_USERS`, checked at authorization, on every token
+refresh, and on every token verification — registering a client grants nothing
+on its own.
+
+See [Configuration](configuration.md) for setup, redirect URIs and the client
+registration model.
+
 ## Code Structure
 
 ```
@@ -116,37 +150,6 @@ Contacts management via CardDAV (similar to CalDAV integration):
 - vCard format (VCF)
 
 **Why CardDAV:** Standard protocol, Fastmail supports it.
-
-### Remote Hosting
-
-Currently, Fastmail Courier runs locally. For cloud deployment:
-
-#### Transport Options
-
-| Current | Remote |
-|---------|--------|
-| stdio transport | Streamable HTTP transport |
-| Local process | Cloudflare Workers / Vercel / etc. |
-
-MCP SDK supports both.
-
-#### Authentication Considerations
-
-**Challenge:** Credentials currently live in local env vars / config file.
-
-**Options:**
-1. **Encrypted credential storage** - One-time setup, credentials stored encrypted per-user
-2. **OAuth 2.0** - If Fastmail expands OAuth support (ideal long-term)
-3. **Session-based credentials** - User provides token per session (not ideal for frequent use)
-
-**Recommended:** Encrypted credential storage with user-provided encryption key or linked account. This avoids re-entering credentials each session while keeping secrets secure.
-
-#### Security Requirements
-
-- HTTPS required
-- No credential logging
-- Rate limiting
-- Audit logging (optional)
 
 ### JMAP Calendar/Contacts
 

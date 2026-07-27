@@ -48,11 +48,19 @@ For multi-user remote hosting, enable OIDC and the encrypted vault:
 ```bash
 export MCP_AUTH_MODE="oidc"
 export MCP_PUBLIC_URL="https://courier.example.com"
-export MCP_OIDC_ISSUER_URL="https://your-issuer.example.com"
+export MCP_OIDC_ISSUER_URL="https://accounts.google.com"
 export MCP_OIDC_CLIENT_ID="your-client-id"
 export MCP_OIDC_CLIENT_SECRET="your-client-secret"
+export MCP_ALLOWED_USERS="you@example.com,partner@example.com"
+export MCP_TOKEN_SECRET="$(openssl rand -hex 32)"
 export FASTMAIL_VAULT_KEY="base64-or-hex-32-byte-key"
 ```
+
+In this mode Courier is its own OAuth authorization server: MCP clients register
+with Courier and it issues its own tokens, while your identity provider only
+signs users in. Clients need no configuration — any client speaking MCP OAuth
+registers itself. Register both `${MCP_PUBLIC_URL}/auth/callback` and
+`${MCP_PUBLIC_URL}/auth/mcp/callback` as redirect URIs with your provider.
 
 Open `/ui` on your server to add Fastmail credentials per user.
 

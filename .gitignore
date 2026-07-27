@@ -28,4 +28,9 @@ npm-debug.log*
 # Agent files
 HANDOFF.md
 AGENTS.md
+CLAUDE.md
+GEMINI.md
+.cursorrules
+.claude/
+docs/DEVELOPMENT.md
 vault_test.json
