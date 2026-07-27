@@ -244,6 +244,11 @@ describe('tokens', () => {
         await expect(other.verifyAccessToken(issued.access_token)).rejects.toThrow();
     });
 
+    it('refuses to start with a weak signing secret', () => {
+        expect(() => makeTokenService({ secret: 'too-short' })).toThrow(/at least 32 characters/);
+        expect(() => makeTokenService({ secret: 'x'.repeat(32) })).not.toThrow();
+    });
+
     it('rejects a token minted for another audience', async () => {
         const issued = await makeTokenService({ audience: 'https://other.example/mcp' }).issue({
             userId: 'u1',

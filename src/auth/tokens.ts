@@ -40,6 +40,7 @@ export interface VerifiedToken {
 
 const ACCESS_TOKEN_TYPE = 'courier+access';
 const REFRESH_TOKEN_TYPE = 'courier+refresh';
+const MIN_SECRET_LENGTH = 32;
 
 export class TokenService {
     private readonly key: Uint8Array;
@@ -47,6 +48,14 @@ export class TokenService {
     constructor(private readonly config: TokenServiceConfig) {
         if (!config.secret) {
             throw new Error('A token signing secret is required for MCP OAuth');
+        }
+        // jose imposes no minimum key length for HS256, so a weak secret would
+        // otherwise sign real access tokens without complaint. Refuse anything
+        // under 256 bits: `openssl rand -hex 32` produces a suitable value.
+        if (config.secret.length < MIN_SECRET_LENGTH) {
+            throw new Error(
+                `Token signing secret must be at least ${MIN_SECRET_LENGTH} characters (got ${config.secret.length}). Generate one with: openssl rand -hex 32`
+            );
         }
         this.key = new TextEncoder().encode(config.secret);
     }
