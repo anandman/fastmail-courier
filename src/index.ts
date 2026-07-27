@@ -7,13 +7,18 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { mcpAuthMetadataRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
+import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 import express from 'express';
 
-import { createOidcVerifier, loadOidcProviderConfig, loadOidcUiConfig, parseAllowedUsers, verifyIdToken } from './auth/oidc.js';
+import { CourierClientStore } from './auth/client-store.js';
+import { CourierOAuthProvider } from './auth/oauth-provider.js';
+import { TokenService } from './auth/tokens.js';
+import { loadOidcProviderConfig, loadOidcUiConfig, parseAllowedUsers, verifyIdToken } from './auth/oidc.js';
 import { createProxyAuthMiddleware } from './auth/proxy.js';
 import { signSession, verifySession } from './auth/session.js';
 import { AccountManager } from './account-manager.js';
@@ -44,6 +49,28 @@ function parseAllowedHosts(value: string | undefined): string[] | undefined {
         .map((entry) => entry.trim())
         .filter(Boolean);
     return allowedHosts.length > 0 ? allowedHosts : undefined;
+}
+
+function parseSeconds(value: string | undefined, fallback: number): number {
+    if (!value) return fallback;
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    return parsed;
+}
+
+/**
+ * Registered MCP clients are kept beside the vault but in their own file: they
+ * churn far more than account configs, and that churn should never rewrite the
+ * file holding Fastmail API tokens.
+ */
+function resolveClientsFilePath(): string {
+    const explicit = process.env.MCP_OAUTH_CLIENTS_FILE;
+    if (explicit) return resolve(explicit);
+
+    const vaultFile = process.env.FASTMAIL_VAULT_FILE;
+    if (vaultFile) return join(dirname(resolve(vaultFile)), 'oauth-clients.json');
+
+    return join(homedir(), '.config', 'fastmail-courier', 'oauth-clients.json');
 }
 
 function parseAuthMode(): 'oidc' | 'proxy' | 'none' {
@@ -140,20 +167,72 @@ async function startHttpServer() {
 
     let oidcProviderConfig: Awaited<ReturnType<typeof loadOidcProviderConfig>> | null = null;
     let oidcUiConfig: ReturnType<typeof loadOidcUiConfig> | null = null;
-    let oidcVerifier: Awaited<ReturnType<typeof createOidcVerifier>> | null = null;
+    let oauthProvider: CourierOAuthProvider | null = null;
 
     if (authMode === 'oidc') {
         oidcProviderConfig = await loadOidcProviderConfig();
         oidcUiConfig = loadOidcUiConfig();
-        oidcVerifier = await createOidcVerifier(oidcProviderConfig);
 
+        const serviceDocumentationUrl = new URL('docs/architecture.md', publicUrl);
+        const upstreamRedirectUri =
+            process.env.MCP_OIDC_MCP_REDIRECT_URI ?? new URL('/auth/mcp/callback', publicUrl).href;
+
+        const provider = new CourierOAuthProvider({
+            clientsStore: new CourierClientStore({ filePath: resolveClientsFilePath() }),
+            tokenService: new TokenService({
+                issuer: publicUrl.href,
+                audience: resourceServerUrl.href,
+                secret:
+                    process.env.MCP_TOKEN_SECRET ??
+                    process.env.MCP_UI_SESSION_SECRET ??
+                    process.env.FASTMAIL_VAULT_KEY ??
+                    '',
+                accessTokenTtlSeconds: parseSeconds(process.env.MCP_ACCESS_TOKEN_TTL, 3600),
+                refreshTokenTtlSeconds: parseSeconds(process.env.MCP_REFRESH_TOKEN_TTL, 30 * 24 * 3600),
+            }),
+            upstream: oidcProviderConfig,
+            upstreamClientId: oidcUiConfig.clientId,
+            upstreamClientSecret: oidcUiConfig.clientSecret,
+            upstreamRedirectUri,
+            upstreamScopes: oidcUiConfig.scopes,
+            resourceUrl: resourceServerUrl.href,
+            allowedUsers: oidcProviderConfig.allowedUsers,
+            userIdClaim: oidcProviderConfig.userIdClaim,
+        });
+        oauthProvider = provider;
+
+        // Courier is the authorization server for MCP clients: it owns dynamic
+        // client registration and issues its own tokens. The upstream identity
+        // provider is reached only from the user's browser during login, never
+        // from a client, so provider-side client caps or datacenter-IP filtering
+        // cannot break a connection.
         app.use(
-            mcpAuthMetadataRouter({
-                oauthMetadata: oidcProviderConfig.metadata,
+            mcpAuthRouter({
+                provider,
+                issuerUrl: publicUrl,
+                baseUrl: publicUrl,
                 resourceServerUrl,
-                serviceDocumentationUrl: new URL('docs/architecture.md', publicUrl),
+                serviceDocumentationUrl,
             })
         );
+
+        app.get('/auth/mcp/callback', (req, res, next) => {
+            provider.handleUpstreamCallback(req, res).catch(next);
+        });
+
+        // The SDK router only mounts the path-suffixed PRM document required by
+        // RFC 9728. Clients that fall back to probing the bare well-known path
+        // (Claude's hosted surfaces do) would otherwise get a 404, so serve the
+        // same document there as well.
+        const rootProtectedResourceMetadata = {
+            resource: resourceServerUrl.href,
+            authorization_servers: [publicUrl.href],
+            resource_documentation: serviceDocumentationUrl.href,
+        };
+        app.get('/.well-known/oauth-protected-resource', (_req, res) => {
+            res.set('Access-Control-Allow-Origin', '*');
+            res.json(rootProtectedResourceMetadata);
+        });
     }
 
     if (authMode === 'proxy') {
@@ -169,9 +248,9 @@ async function startHttpServer() {
     }
 
     const mcpAuthMiddleware =
-        authMode === 'oidc' && oidcVerifier
+        authMode === 'oidc' && oauthProvider
             ? requireBearerAuth({
-                  verifier: oidcVerifier,
+                  verifier: oauthProvider,
                   requiredScopes: oidcProviderConfig?.requiredScopes ?? [],
                   resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resourceServerUrl),
               })

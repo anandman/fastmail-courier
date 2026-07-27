@@ -4,16 +4,22 @@
 
 import { config } from 'dotenv';
 import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-// Load test environment variables
-const envPath = join(process.cwd(), '.env.test');
+// .env.test holds live Fastmail tokens, so it lives outside the source tree —
+// the repo is inside a synced Dropbox folder and .gitignore does not stop that.
+const DEFAULT_TEST_ENV_PATH = join(homedir(), '.local', 'state', 'fastmail-courier', '.env.test');
 
-if (existsSync(envPath)) {
+const envPath = [process.env.FASTMAIL_TEST_ENV_FILE, DEFAULT_TEST_ENV_PATH].find(
+    (candidate): candidate is string => !!candidate && existsSync(candidate)
+);
+
+if (envPath) {
     config({ path: envPath });
 } else {
     console.warn(
-        '\n⚠️  No .env.test file found. Copy .env.test.example to .env.test and configure your test accounts.\n'
+        `\n⚠️  No .env.test file found. Copy .env.test.example to ${DEFAULT_TEST_ENV_PATH} and configure your test accounts.\n`
     );
 }
 
