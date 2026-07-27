@@ -17,7 +17,8 @@ Detailed configuration options for Fastmail Courier.
 | `MCP_HTTP_ALLOWED_HOSTS` | No | Comma-separated hostnames allowed in Host header (optional) |
 | `MCP_PUBLIC_URL` | No | Public base URL used for OAuth metadata and UI redirects |
 | `MCP_AUTH_MODE` | No | `oidc`, `proxy`, or `none` (auto-detected if unset) |
-| `MCP_ALLOWED_USERS` | No | Comma-separated allowlist of emails or user IDs |
+| `MCP_ALLOWED_USERS` | **Yes** (oidc/proxy) | Comma-separated allowlist of emails or user IDs. The server refuses to start without it |
+| `MCP_ALLOW_ANY_AUTHENTICATED_USER` | No | Set `true` to run with no allowlist, accepting every identity the provider authenticates |
 | `MCP_USER_ID_CLAIM` | No | Claim to identify users (`email` default, `sub` optional) |
 | `MCP_OIDC_ISSUER_URL` | No | Identity provider issuer URL (required for OIDC auth) |
 | `MCP_OIDC_CLIENT_ID` | No | Client ID Courier uses at the identity provider |

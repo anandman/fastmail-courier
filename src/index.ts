@@ -77,6 +77,33 @@ function resolveClientsFilePath(): string {
     return join(homedir(), '.config', 'fastmail-courier', 'oauth-clients.json');
 }
 
+/**
+ * Refuses to start when authentication is enabled but no allowlist is set.
+ *
+ * Every allowlist check is guarded by `allowedUsers && ...`, so an unset or
+ * unparsed `MCP_ALLOWED_USERS` short-circuits them all and admits anyone the
+ * upstream provider is willing to authenticate. Because that path never errors,
+ * a config file that silently failed to load would open the server to the
+ * internet with nothing in the logs to show for it. Fail closed instead, and
+ * require an explicit opt-in for the legitimate "any authenticated user" case.
+ */
+export function assertAccessIsRestricted(mode: 'oidc' | 'proxy', allowedUsers?: Set<string>): void {
+    if (allowedUsers && allowedUsers.size > 0) return;
+
+    const optOut = process.env.MCP_ALLOW_ANY_AUTHENTICATED_USER;
+    if (optOut === 'true' || optOut === '1') {
+        console.warn(
+            `[auth] MCP_ALLOW_ANY_AUTHENTICATED_USER is set: every identity accepted by the ${mode} provider will be granted access.`
+        );
+        return;
+    }
+
+    throw new Error(
+        `MCP_ALLOWED_USERS is required in ${mode} auth mode. Without it every allowlist check is skipped and any identity the provider authenticates would be admitted. ` +
+            'Set a comma-separated allowlist, or set MCP_ALLOW_ANY_AUTHENTICATED_USER=true to accept that deliberately.'
+    );
+}
+
 function parseAuthMode(): 'oidc' | 'proxy' | 'none' {
     const explicit = process.env.MCP_AUTH_MODE?.toLowerCase();
     if (explicit === 'oidc' || explicit === 'proxy' || explicit === 'none') {
@@ -202,6 +229,7 @@ async function startHttpServer() {
     if (authMode === 'oidc') {
         oidcProviderConfig = await loadOidcProviderConfig();
         oidcUiConfig = loadOidcUiConfig();
+        assertAccessIsRestricted('oidc', oidcProviderConfig.allowedUsers);
 
         // Advertised in protected resource metadata as `resource_documentation`.
         // It previously defaulted to a path on this server that nothing serves,
@@ -300,6 +328,7 @@ async function startHttpServer() {
 
     if (authMode === 'proxy') {
         const allowlist = parseAllowedUsers(process.env.MCP_ALLOWED_USERS);
+        assertAccessIsRestricted('proxy', allowlist);
         app.use(
             createProxyAuthMiddleware({
                 emailHeader: (process.env.MCP_AUTH_PROXY_EMAIL_HEADER ?? 'x-auth-email').toLowerCase(),
