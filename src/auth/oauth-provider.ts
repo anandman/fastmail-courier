@@ -1,6 +1,11 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type express from 'express';
-import { InvalidGrantError, InvalidRequestError, ServerError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
+import {
+    InvalidGrantError,
+    InvalidRequestError,
+    InvalidTokenError,
+    ServerError,
+} from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import type { AuthorizationParams, OAuthServerProvider } from '@modelcontextprotocol/sdk/server/auth/provider.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { OAuthClientInformationFull, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
@@ -249,11 +254,21 @@ export class CourierOAuthProvider implements OAuthServerProvider {
     }
 
     async verifyAccessToken(token: string): Promise<AuthInfo> {
-        const verified = await this.options.tokenService.verifyAccessToken(token);
+        // Every rejection here must be an InvalidTokenError. The bearer-auth
+        // middleware maps only that to a 401 with WWW-Authenticate, and a 401 is
+        // what tells a client its token is stale and to re-run the OAuth flow.
+        // Any other error becomes a 500, which clients read as a broken server
+        // and retry forever instead of re-authenticating.
+        let verified;
+        try {
+            verified = await this.options.tokenService.verifyAccessToken(token);
+        } catch {
+            throw new InvalidTokenError('Access token is invalid or has expired');
+        }
 
         const { allowedUsers } = this.options;
         if (allowedUsers && allowedUsers.size > 0 && !allowedUsers.has(verified.userId.toLowerCase())) {
-            throw new Error('User not allowed');
+            throw new InvalidTokenError('User not allowed');
         }
 
         return {

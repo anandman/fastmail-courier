@@ -10,6 +10,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
+
 import { CourierClientStore } from '../src/auth/client-store.js';
 import { CourierOAuthProvider } from '../src/auth/oauth-provider.js';
 import { TokenService } from '../src/auth/tokens.js';
@@ -296,6 +298,27 @@ describe('refresh grant', () => {
 });
 
 describe('verifyAccessToken', () => {
+    // A 401 is what tells a client to re-authenticate; anything else becomes a
+    // 500 and the client retries forever against a server that will never
+    // accept its stale token.
+    it.each([
+        ['a malformed token', 'not-a-jwt'],
+        ['a token signed with another key', 'header.payload.badsignature'],
+    ])('reports %s as InvalidTokenError so the client gets a 401', async (_label, token) => {
+        await expect(makeProvider().verifyAccessToken(token)).rejects.toBeInstanceOf(InvalidTokenError);
+    });
+
+    it('reports an allowlist rejection as InvalidTokenError too', async () => {
+        const tokenService = makeTokenService();
+        const issued = await tokenService.issue({ userId: 'u1', clientId: 'client-a', scopes: [] });
+
+        await expect(
+            makeProvider({ tokenService, allowedUsers: new Set(['someone-else']) }).verifyAccessToken(
+                issued.access_token
+            )
+        ).rejects.toBeInstanceOf(InvalidTokenError);
+    });
+
     it('enforces the allowlist', async () => {
         const tokenService = makeTokenService();
         const issued = await tokenService.issue({ userId: 'u1', clientId: 'client-a', scopes: [] });
