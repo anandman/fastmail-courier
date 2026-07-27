@@ -5,7 +5,7 @@ An MCP server that connects AI assistants to your Fastmail email, calendar, and 
 ## Quick Install
 
 ```bash
-git clone https://github.com/yourusername/fastmail-courier.git
+git clone https://github.com/anandman/fastmail-courier.git
 cd fastmail-courier
 npm install
 npm run build
@@ -19,17 +19,13 @@ npm run build
    export FASTMAIL_API_TOKEN="fmu1-your-token"
    export FASTMAIL_EMAIL="you@fastmail.com"
    ```
-3. **Add to AI CLI** (Claude Desktop, Gemini CLI):
-   ```json
-   {
-     "mcpServers": {
-    "Fastmail Courier": {
-         "command": "node",
-         "args": ["/path/to/fastmail-courier/dist/index.js"]
-       }
-     }
-   }
+3. **Add to a client.** Claude Code:
+   ```bash
+   claude mcp add fastmail-courier -- node /path/to/fastmail-courier/dist/index.js
    ```
+   Claude Desktop (`claude_desktop_config.json`) and Codex
+   (`~/.codex/config.toml`) take the same command and path in their own formats
+   — see [Getting Started](docs/getting-started.md#connect-a-client-local).
 
 ## Remote Hosting (Optional)
 
@@ -64,6 +60,13 @@ registers itself. Register both `${MCP_PUBLIC_URL}/auth/callback` and
 
 Open `/ui` on your server to add Fastmail credentials per user.
 
+To connect, give any client the server URL — `https://courier.example.com/mcp` —
+and nothing else. In claude.ai, Claude Desktop and ChatGPT that's
+**Settings → Connectors → add a custom connector**; in Claude Code it's
+`claude mcp add --transport http`; in Codex it's a `url` entry in
+`~/.codex/config.toml`. Each opens a browser once to sign in. See
+[Getting Started](docs/getting-started.md#connect-a-client-remote).
+
 See [Configuration](docs/configuration.md) for full auth and vault options.
 
 For calendar/tasks, you'll also need an app password. See [Getting Started](docs/getting-started.md).
@@ -87,7 +90,7 @@ stateless HTTP call without changing the persisted default.
 
 - [Getting Started](docs/getting-started.md) - Full setup guide
 - [Configuration](docs/configuration.md) - Multi-account, CalDAV options
-- [Tools Reference](docs/tools.md) - All 22 tools with parameters
+- [Tools Reference](docs/tools.md) - All 36 tools with parameters
 - [Examples](docs/examples.md) - Common prompts
 - [Architecture](docs/architecture.md) - Design & future plans
 
