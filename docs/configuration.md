@@ -52,6 +52,25 @@ Signing out clears Courier's local UI session and returns to a non-cacheable
 login page. This makes identity selection interactive without relying on a
 provider-specific logout endpoint.
 
+## Available Tools (per user)
+
+Courier exposes 36 tools in four feature groups — **Email** (15), **Contacts** (6),
+**Calendar** (6) and **Fastmail Tasks** (6) — plus three account tools that are
+always available, since they are how clients discover and target accounts.
+
+Each signed-in identity chooses which groups to expose, under **Advanced —
+available tools** in the setup UI. This is a per-user preference rather than
+server configuration: one person may never use Fastmail Tasks while another
+relies on them, and both are served by the same Courier.
+
+A hidden group is omitted from `tools/list` *and* refused if called, so a client
+holding a cached tool list cannot keep using it. Turning off groups you do not
+need also leaves more room in the model's context for the ones you do.
+
+The preference is stored with the user's accounts as `disabledToolGroups`. An
+absent value means everything is enabled, so existing configs need no migration
+and groups added in future versions are on by default.
+
 ## Config File
 
 Location: `~/.config/fastmail-courier/accounts.json`

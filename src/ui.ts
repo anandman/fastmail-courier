@@ -1,3 +1,5 @@
+import { ALWAYS_AVAILABLE_TOOLS, TOOL_GROUPS, type ToolGroupId } from './tools/groups.js';
+
 type AuthMode = 'oidc' | 'proxy' | 'none';
 
 export interface UiUser {
@@ -212,6 +214,37 @@ const styles = `
     box-shadow: 0 12px 35px rgba(45, 61, 94, 0.07);
     backdrop-filter: blur(14px);
   }
+
+  .advanced {
+    margin-top: 24px;
+  }
+
+  .advanced > summary {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    list-style: none;
+  }
+
+  .advanced > summary::-webkit-details-marker { display: none; }
+
+  .advanced > summary::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid var(--muted);
+    border-bottom: 2px solid var(--muted);
+    transform: rotate(-45deg);
+    transition: transform 120ms ease;
+    flex: none;
+  }
+
+  .advanced[open] > summary::before { transform: rotate(45deg); }
+
+  .advanced > summary .card-intro { display: block; margin-top: 2px; }
+
+  .advanced > form { margin-top: 20px; }
 
   .card-header {
     display: flex;
@@ -672,7 +705,8 @@ export function renderUiPage(
     user: UiUser,
     accounts: UiAccount[],
     defaultAccount: string | null,
-    selectedAccountName: string | null = null
+    selectedAccountName: string | null = null,
+    disabledToolGroups: readonly ToolGroupId[] = []
 ): string {
     const selectedAccount =
         accounts.find((account) => account.name === selectedAccountName) ?? null;
@@ -707,6 +741,25 @@ export function renderUiPage(
           <strong>No accounts connected</strong>
           <p>Add a Fastmail account to make mail, contacts, calendars, and tasks available to your MCP clients.</p>
         </div>`;
+
+    const enabledGroups = TOOL_GROUPS.filter((group) => !disabledToolGroups.includes(group.id));
+    const visibleToolCount =
+        ALWAYS_AVAILABLE_TOOLS.length +
+        enabledGroups.reduce((total, group) => total + group.tools.length, 0);
+    const totalToolCount =
+        ALWAYS_AVAILABLE_TOOLS.length +
+        TOOL_GROUPS.reduce((total, group) => total + group.tools.length, 0);
+
+    const toolGroupRows = TOOL_GROUPS.map((group) => {
+        const enabled = !disabledToolGroups.includes(group.id);
+        return `<div class="checkbox-row">
+            <input id="group-${group.id}" name="group" value="${escapeHtml(group.id)}" type="checkbox" ${enabled ? 'checked' : ''} />
+            <div class="checkbox-copy">
+              <label for="group-${group.id}">${escapeHtml(group.label)} <span class="badge">${group.tools.length} tools</span></label>
+              <span>${escapeHtml(group.description)}</span>
+            </div>
+          </div>`;
+    }).join('');
 
     const identity = escapeHtml(user.email?.trim() || 'Authenticated user');
     const editing = Boolean(selectedAccount);
@@ -824,6 +877,29 @@ export function renderUiPage(
               </form>
             </section>
           </div>
+
+          <details class="card advanced">
+            <summary>
+              <span>
+                <strong>Advanced — available tools</strong>
+                <span class="card-intro">${visibleToolCount} of ${totalToolCount} tools offered to your MCP clients.</span>
+              </span>
+            </summary>
+            <form method="post" action="/ui/tools">
+              <p class="card-intro">
+                Turn off anything you do not use. Hidden tools are not offered to any client and cannot be
+                called, which also leaves more room in the model's context for the ones you do use.
+                This setting applies to your identity only.
+              </p>
+              <div class="form-grid">
+                ${toolGroupRows}
+              </div>
+              <div class="actions">
+                <button class="button primary" type="submit">${checkIcon} Save tool settings</button>
+                <span class="hint">Account tools are always available; they are how clients find and target your accounts.</span>
+              </div>
+            </form>
+          </details>
 
           <div class="actions">
             <p class="footer-note">Courier only exposes accounts to the authenticated identity that configured them.</p>

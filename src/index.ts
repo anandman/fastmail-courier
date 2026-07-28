@@ -26,6 +26,7 @@ import { loadOidcProviderConfig, loadOidcUiConfig, parseAllowedUsers, verifyIdTo
 import { createProxyAuthMiddleware } from './auth/proxy.js';
 import { signSession, verifySession } from './auth/session.js';
 import { AccountManager } from './account-manager.js';
+import { TOOL_GROUP_IDS } from './tools/groups.js';
 import { handleStatelessMcpRequest } from './http-transport.js';
 import { createMcpServer } from './mcp-server.js';
 import { createVaultStore } from './vault/index.js';
@@ -490,7 +491,49 @@ async function startHttpServer() {
         const selectedAccount = accounts.some((account) => account.name === requestedAccount)
             ? requestedAccount
             : null;
-        res.status(200).send(renderUiPage(uiUser, accounts, defaultAccount, selectedAccount));
+        res.status(200).send(
+            renderUiPage(
+                uiUser,
+                accounts,
+                defaultAccount,
+                selectedAccount,
+                manager.getDisabledToolGroups()
+            )
+        );
+    });
+
+    app.post('/ui/tools', async (req, res) => {
+        const uiUser = resolveUiUser(req, authMode);
+        if (!uiUser) {
+            res.status(401).send('Unauthorized');
+            return;
+        }
+
+        if (!vault) {
+            res.status(500).send('Vault storage is not configured');
+            return;
+        }
+
+        // Unchecked boxes are simply absent from a form post, so the enabled set
+        // is what arrives and the disabled set is everything else. A single
+        // checkbox posts a string rather than an array.
+        const submitted = req.body.group;
+        const enabled = new Set(
+            (Array.isArray(submitted) ? submitted : submitted ? [submitted] : []).map(String)
+        );
+        const disabled = TOOL_GROUP_IDS.filter((id) => !enabled.has(id));
+
+        await vault.updateUserConfig(uiUser.userId, (latestConfig) => {
+            const latestManager = new AccountManager({
+                initialConfig: latestConfig ?? { accounts: [], defaultAccount: '' },
+                allowEnv: false,
+                allowConfigFile: false,
+            });
+            latestManager.setDisabledToolGroups(disabled);
+            return latestManager.exportConfig();
+        });
+
+        res.redirect('/ui');
     });
 
     app.post('/ui/account', async (req, res) => {

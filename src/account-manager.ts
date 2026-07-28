@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import type { AccountConfig, MultiAccountConfig } from 'jmap-courier';
 import type { CalDAVConfig } from './caldav/types.js';
 import { getRequestContext } from './request-context.js';
+import { parseDisabledGroups, type ToolGroupId } from './tools/groups.js';
 
 const FASTMAIL_SESSION_URL = 'https://api.fastmail.com/jmap/session';
 const FASTMAIL_CALDAV_URL = 'https://caldav.fastmail.com';
@@ -40,6 +41,12 @@ export interface ExtendedAccountConfig extends AccountConfig {
 export interface ExtendedMultiAccountConfig {
     accounts: ExtendedAccountConfig[];
     defaultAccount: string;
+    /**
+     * Feature groups this user has turned off. Absent means everything is on,
+     * so existing stored configs need no migration and groups added later
+     * default to visible.
+     */
+    disabledToolGroups?: ToolGroupId[];
 }
 
 export interface AccountManagerOptions {
@@ -59,6 +66,7 @@ export class AccountManager {
     private defaultAccountName: string | null = null;
     /** CalDAV password from environment variable (shared across accounts) */
     private envCalDAVPassword: string | null = null;
+    private disabledToolGroups: ToolGroupId[] = [];
     private onChange?: (config: ExtendedMultiAccountConfig) => void;
 
     constructor(options: AccountManagerOptions = {}) {
@@ -174,6 +182,18 @@ export class AccountManager {
             this.currentAccountName = config.accounts[0].name;
             this.defaultAccountName = config.accounts[0].name;
         }
+
+        this.disabledToolGroups = parseDisabledGroups(config.disabledToolGroups);
+    }
+
+    /** Feature groups this user has turned off; empty means every tool is visible. */
+    getDisabledToolGroups(): ToolGroupId[] {
+        return [...this.disabledToolGroups];
+    }
+
+    setDisabledToolGroups(groups: readonly ToolGroupId[]): void {
+        this.disabledToolGroups = parseDisabledGroups([...groups]);
+        this.persist();
     }
 
     private persist(): void {
@@ -279,6 +299,11 @@ export class AccountManager {
         return {
             accounts: this.getAccounts(),
             defaultAccount: this.defaultAccountName ?? '',
+            // Omitted when empty so an untouched config stays byte-identical to
+            // what earlier versions wrote.
+            ...(this.disabledToolGroups.length > 0
+                ? { disabledToolGroups: [...this.disabledToolGroups] }
+                : {}),
         };
     }
 
