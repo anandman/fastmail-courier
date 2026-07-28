@@ -171,6 +171,16 @@ export class CourierOAuthProvider implements OAuthServerProvider {
         if (pending.clientState) {
             target.searchParams.set('state', pending.clientState);
         }
+        // A client that receives this and never returns for a token has either
+        // rejected the response or failed to reach us, and the two look
+        // identical from here. Record what was actually handed back -- origin,
+        // path and parameter shape -- so the next silent failure can be told
+        // apart from a malformed redirect. The code itself is withheld: it is a
+        // bearer credential until it is redeemed.
+        console.warn(
+            `[auth] issued authorization code to ${pending.clientId} -> ${target.origin}${target.pathname}` +
+                ` (code=${authorizationCode.length} chars, state=${pending.clientState ?? 'ABSENT'})`
+        );
         res.redirect(target.toString());
     }
 
