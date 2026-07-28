@@ -9,7 +9,7 @@ import type { EmailFilter, EmailSummary } from 'jmap-courier';
 
 // Tool schemas
 export const searchEmailsSchema = z.object({
-    mailbox: z.string().optional().describe('Mailbox name or ID to search in (e.g., "Inbox", "Sent"). Use this to narrow results and save tokens.'),
+    mailbox: z.string().optional().describe('Mailbox name or ID to search in (e.g., "Inbox", "Sent", "Archive"). Omit to search all mail EXCEPT Junk and Trash, which is usually what you want. Pass "Inbox" when the question is specifically about the inbox ("do I have new mail?", "what is my latest unread message?"), since mail filed into other folders would otherwise be included. Pass "Junk" or "Trash" explicitly to search those — they are never searched by default.'),
     query: z.string().optional().describe('Full-text search query (use sparingly; can expand results).'),
     from: z.string().optional().describe('Filter by sender email or name'),
     to: z.string().optional().describe('Filter by recipient email or name'),
@@ -48,6 +48,19 @@ export async function searchEmails(
             filter.inMailbox = mailbox.id;
         } else {
             throw new Error(`Mailbox not found: ${params.mailbox}`);
+        }
+    } else {
+        // An unscoped JMAP query spans every mailbox, so "my latest unread
+        // message" would happily return spam. Exclude Junk and Trash the way
+        // every mail client does, while still searching Archive, Sent and
+        // custom folders. Naming either mailbox explicitly above opts back in.
+        const excluded = (
+            await Promise.all([client.getMailboxByRole('junk'), client.getMailboxByRole('trash')])
+        )
+            .filter((mailbox): mailbox is NonNullable<typeof mailbox> => mailbox !== null)
+            .map((mailbox) => mailbox.id);
+        if (excluded.length > 0) {
+            filter.inMailboxOtherThan = excluded;
         }
     }
 
