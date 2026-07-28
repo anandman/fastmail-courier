@@ -145,6 +145,11 @@ export class CourierOAuthProvider implements OAuthServerProvider {
 
         const { allowedUsers } = this.options;
         if (allowedUsers && allowedUsers.size > 0 && !allowedUsers.has(userId.toLowerCase())) {
+            // Name the identity that was turned away. The provider may sign the
+            // user in silently as whichever account it already had (authuser=0),
+            // so "which account did it actually use" is the whole question here
+            // and the client never surfaces the answer.
+            console.warn(`[auth] identity "${userId}" is not in MCP_ALLOWED_USERS`);
             redirectWithError(res, pending, 'access_denied', 'This account is not permitted to use this server');
             return;
         }
@@ -357,6 +362,12 @@ function redirectWithError(
     error: string,
     description?: string
 ): void {
+    // Every failure here leaves the same trace as success -- a 302 back to the
+    // client -- so without this line an authorization that was refused is
+    // indistinguishable in the log from one that was granted. The client shows
+    // the user a generic failure and simply never returns for a token.
+    console.warn(`[auth] authorization refused for client ${pending.clientId}: ${error}${description ? ` (${description})` : ''}`);
+
     const target = new URL(pending.redirectUri);
     target.searchParams.set('error', error);
     if (description) {
