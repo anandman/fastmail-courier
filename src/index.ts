@@ -226,6 +226,9 @@ async function startHttpServer() {
     let oidcProviderConfig: Awaited<ReturnType<typeof loadOidcProviderConfig>> | null = null;
     let oidcUiConfig: ReturnType<typeof loadOidcUiConfig> | null = null;
     let oauthProvider: CourierOAuthProvider | null = null;
+    // Hoisted so the settings UI can list and revoke clients. Only populated in
+    // oidc mode; proxy and none modes have no client registry of their own.
+    let clientStore: CourierClientStore | null = null;
 
     if (authMode === 'oidc') {
         oidcProviderConfig = await loadOidcProviderConfig();
@@ -242,8 +245,10 @@ async function startHttpServer() {
         const upstreamRedirectUri =
             process.env.MCP_OIDC_MCP_REDIRECT_URI ?? new URL('/auth/mcp/callback', publicUrl).href;
 
+        clientStore = new CourierClientStore({ filePath: resolveClientsFilePath() });
+
         const provider = new CourierOAuthProvider({
-            clientsStore: new CourierClientStore({ filePath: resolveClientsFilePath() }),
+            clientsStore: clientStore,
             tokenService: new TokenService({
                 issuer: publicUrl.href,
                 audience: resourceServerUrl.href,
@@ -491,15 +496,53 @@ async function startHttpServer() {
         const selectedAccount = accounts.some((account) => account.name === requestedAccount)
             ? requestedAccount
             : null;
+        const [clients, unattributed] = clientStore
+            ? await Promise.all([
+                  clientStore.listClientsForOwner(uiUser.userId),
+                  clientStore.listUnattributedClients(),
+              ])
+            : [[], []];
+
         res.status(200).send(
             renderUiPage(
                 uiUser,
                 accounts,
                 defaultAccount,
                 selectedAccount,
-                manager.getDisabledToolGroups()
+                manager.getDisabledToolGroups(),
+                clients,
+                unattributed
             )
         );
+    });
+
+    app.post('/ui/clients/revoke', async (req, res) => {
+        const uiUser = resolveUiUser(req, authMode);
+        if (!uiUser) {
+            res.status(401).send('Unauthorized');
+            return;
+        }
+
+        if (!clientStore) {
+            res.status(500).send('Client registry is not configured');
+            return;
+        }
+
+        const clientId = String(req.body.clientId ?? '').trim();
+        if (!clientId) {
+            res.status(400).send('clientId is required');
+            return;
+        }
+
+        const revoked = await clientStore.deleteClient(clientId, uiUser.userId);
+        // A failure here is either someone else's client or one that no longer
+        // exists, and the two are deliberately indistinguishable to the caller:
+        // saying which would confirm the existence of another user's client.
+        console.warn(
+            `[auth] ${uiUser.userId} revoked client ${clientId}: ${revoked ? 'removed' : 'not found or not theirs'}`
+        );
+
+        res.redirect('/ui');
     });
 
     app.post('/ui/tools', async (req, res) => {

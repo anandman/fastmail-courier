@@ -231,8 +231,11 @@ export class CourierOAuthProvider implements OAuthServerProvider {
         });
 
         // The client has now proven a real, allowlisted user authorized it, so it
-        // graduates from the in-memory registry to durable storage.
-        await this.options.clientsStore.promoteClient(entry.clientId);
+        // graduates from the in-memory registry to durable storage. This is also
+        // the only point where Courier knows both the client and the human, so
+        // it is where ownership is recorded -- registration is anonymous by
+        // RFC 7591, and a token afterwards proves only that someone holds it.
+        await this.options.clientsStore.promoteClient(entry.clientId, entry.userId);
 
         return tokens as OAuthTokens;
     }
@@ -291,6 +294,20 @@ export class CourierOAuthProvider implements OAuthServerProvider {
         if (allowedUsers && allowedUsers.size > 0 && !allowedUsers.has(verified.userId.toLowerCase())) {
             throw new InvalidTokenError('User not allowed');
         }
+
+        // Access tokens are self-contained, so revoking a client by deleting it
+        // would otherwise leave its existing token cryptographically valid until
+        // expiry -- up to an hour of access for a client the user has explicitly
+        // decided not to trust. Checking the client still exists makes the
+        // revoke button mean what it says. The store is already in memory, so
+        // this is a map lookup, not I/O.
+        if (!(await this.options.clientsStore.getClient(verified.clientId))) {
+            throw new InvalidTokenError('Client is no longer authorized');
+        }
+
+        // Best-effort liveness stamp so the settings UI can show which clients
+        // are actually in use. Never allowed to fail a request.
+        void this.options.clientsStore.touchClient(verified.clientId).catch(() => undefined);
 
         return {
             token,

@@ -215,6 +215,59 @@ const styles = `
     backdrop-filter: blur(14px);
   }
 
+  .clients-card {
+    margin-top: 24px;
+  }
+
+  .client-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .client {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid rgba(218, 224, 235, 0.9);
+    border-radius: 14px;
+  }
+
+  .client-main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .client-name { font-weight: 600; }
+
+  .client-meta {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .unattributed-note {
+    margin-top: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 12px;
+  }
+
+  .button.danger {
+    border-color: rgba(190, 60, 60, 0.35);
+    color: #a52b2b;
+    background: rgba(190, 60, 60, 0.06);
+    flex: none;
+  }
+
+  .button.danger:hover {
+    background: rgba(190, 60, 60, 0.12);
+  }
+
   .advanced {
     margin-top: 24px;
   }
@@ -701,12 +754,48 @@ export function renderNoVaultPage(): string {
     );
 }
 
+export interface UiClient {
+    clientId: string;
+    clientName?: string;
+    ownerId?: string;
+    promotedAt?: number;
+    lastSeenAt?: number;
+}
+
+/** "3 minutes ago" style relative time; absolute dates are noise at this scale. */
+function relativeTime(timestamp: number | undefined, now: number = Date.now()): string {
+    if (timestamp === undefined) return 'unknown';
+    const seconds = Math.max(0, Math.round((now - timestamp) / 1000));
+    // Each pair is the divisor to leave the current unit and the unit it yields,
+    // so the name always describes the value *after* the division.
+    const units: Array<[number, string]> = [
+        [60, 'minute'],
+        [60, 'hour'],
+        [24, 'day'],
+        [7, 'week'],
+        [4.35, 'month'],
+        [12, 'year'],
+    ];
+
+    let value = seconds;
+    let unit = 'second';
+    for (const [size, nextUnit] of units) {
+        if (value < size) break;
+        value = Math.floor(value / size);
+        unit = nextUnit;
+    }
+    if (unit === 'second' && value < 45) return 'just now';
+    return `${value} ${unit}${value === 1 ? '' : 's'} ago`;
+}
+
 export function renderUiPage(
     user: UiUser,
     accounts: UiAccount[],
     defaultAccount: string | null,
     selectedAccountName: string | null = null,
-    disabledToolGroups: readonly ToolGroupId[] = []
+    disabledToolGroups: readonly ToolGroupId[] = [],
+    clients: UiClient[] = [],
+    unattributedClients: UiClient[] = []
 ): string {
     const selectedAccount =
         accounts.find((account) => account.name === selectedAccountName) ?? null;
@@ -760,6 +849,37 @@ export function renderUiPage(
             </div>
           </div>`;
     }).join('');
+
+    const renderClientRow = (client: UiClient, unattributed: boolean) => {
+        const name = escapeHtml(client.clientName?.trim() || 'Unnamed client');
+        return `<div class="client">
+            <div class="client-main">
+              <span class="client-name">${name}</span>
+              <span class="client-meta">Authorized ${escapeHtml(relativeTime(client.promotedAt))} · Last used ${escapeHtml(relativeTime(client.lastSeenAt))}</span>
+              ${unattributed ? '<span class="client-meta">Authorized before Courier recorded which user connected it.</span>' : ''}
+            </div>
+            <form method="post" action="/ui/clients/revoke">
+              <input type="hidden" name="clientId" value="${escapeHtml(client.clientId)}" />
+              <button class="button danger" type="submit">Revoke</button>
+            </form>
+          </div>`;
+    };
+
+    const clientRows = clients.map((client) => renderClientRow(client, false)).join('');
+    const unattributedRows = unattributedClients
+        .map((client) => renderClientRow(client, true))
+        .join('');
+    const clientsContent =
+        clientRows || unattributedRows
+            ? `${clientRows}${
+                  unattributedRows
+                      ? `<p class="card-intro unattributed-note">Authorized before ownership was recorded</p>${unattributedRows}`
+                      : ''
+              }`
+            : `<div class="empty">
+                <strong>No clients authorized yet</strong>
+                <p>MCP clients appear here once you complete a sign-in from them.</p>
+              </div>`;
 
     const identity = escapeHtml(user.email?.trim() || 'Authenticated user');
     const editing = Boolean(selectedAccount);
@@ -877,6 +997,17 @@ export function renderUiPage(
               </form>
             </section>
           </div>
+
+          <section class="card clients-card" aria-labelledby="clients-heading">
+            <div class="card-header">
+              <div>
+                <h2 id="clients-heading">Authorized clients</h2>
+                <p class="card-intro">Apps you have signed into from an MCP client. Revoking one cuts off its access immediately and forces it to sign in again.</p>
+              </div>
+              <span class="count" aria-label="${clients.length + unattributedClients.length} authorized clients">${clients.length + unattributedClients.length}</span>
+            </div>
+            <div class="client-list">${clientsContent}</div>
+          </section>
 
           <details class="card advanced">
             <summary>

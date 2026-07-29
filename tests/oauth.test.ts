@@ -363,6 +363,13 @@ describe('verifyAccessToken', () => {
 
     it('exposes the subject so per-user vaults resolve', async () => {
         const tokenService = makeTokenService();
+        const store = new CourierClientStore({ filePath: clientsFile });
+        const registered = await store.registerClient({
+            client_id: 'client-a',
+            redirect_uris: ['https://client.example/callback'],
+        } as never);
+        await store.promoteClient(registered.client_id, 'google-oauth2|123');
+
         const issued = await tokenService.issue({
             userId: 'google-oauth2|123',
             email: 'user@example.com',
@@ -370,10 +377,41 @@ describe('verifyAccessToken', () => {
             scopes: ['openid'],
         });
 
-        const authInfo = await makeProvider({ tokenService }).verifyAccessToken(issued.access_token);
+        const authInfo = await makeProvider({ tokenService, store }).verifyAccessToken(
+            issued.access_token
+        );
 
         expect(authInfo.clientId).toBe('client-a');
         expect(authInfo.extra?.sub).toBe('google-oauth2|123');
         expect(authInfo.extra?.email).toBe('user@example.com');
+    });
+
+    it('rejects a token whose client has been revoked', async () => {
+        // Access tokens are self-contained, so without this check a revoked
+        // client would keep working until its token expired -- up to an hour.
+        const tokenService = makeTokenService();
+        const store = new CourierClientStore({ filePath: clientsFile });
+        const registered = await store.registerClient({
+            client_id: 'client-revoked',
+            redirect_uris: ['https://client.example/callback'],
+        } as never);
+        await store.promoteClient(registered.client_id, 'owner@example.com');
+
+        const issued = await tokenService.issue({
+            userId: 'owner@example.com',
+            clientId: 'client-revoked',
+            scopes: [],
+        });
+        const provider = makeProvider({ tokenService, store });
+
+        await expect(provider.verifyAccessToken(issued.access_token)).resolves.toMatchObject({
+            clientId: 'client-revoked',
+        });
+
+        expect(await store.deleteClient('client-revoked', 'owner@example.com')).toBe(true);
+
+        await expect(provider.verifyAccessToken(issued.access_token)).rejects.toThrow(
+            /no longer authorized/
+        );
     });
 });
