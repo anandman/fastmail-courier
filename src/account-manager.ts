@@ -47,6 +47,12 @@ export interface ExtendedMultiAccountConfig {
      * default to visible.
      */
     disabledToolGroups?: ToolGroupId[];
+    /**
+     * When the tool selection last changed, so a client holding a cached tool
+     * list can be told to refetch. Absent means it has never been changed,
+     * which is precisely when there is nothing to notify anyone about.
+     */
+    toolSettingsUpdatedAt?: number;
 }
 
 export interface AccountManagerOptions {
@@ -67,6 +73,7 @@ export class AccountManager {
     /** CalDAV password from environment variable (shared across accounts) */
     private envCalDAVPassword: string | null = null;
     private disabledToolGroups: ToolGroupId[] = [];
+    private toolSettingsUpdatedAt: number | undefined;
     private onChange?: (config: ExtendedMultiAccountConfig) => void;
 
     constructor(options: AccountManagerOptions = {}) {
@@ -184,6 +191,8 @@ export class AccountManager {
         }
 
         this.disabledToolGroups = parseDisabledGroups(config.disabledToolGroups);
+        this.toolSettingsUpdatedAt =
+            typeof config.toolSettingsUpdatedAt === 'number' ? config.toolSettingsUpdatedAt : undefined;
     }
 
     /** Feature groups this user has turned off; empty means every tool is visible. */
@@ -191,8 +200,23 @@ export class AccountManager {
         return [...this.disabledToolGroups];
     }
 
+    /** When the selection last changed, or undefined if it never has. */
+    getToolSettingsUpdatedAt(): number | undefined {
+        return this.toolSettingsUpdatedAt;
+    }
+
     setDisabledToolGroups(groups: readonly ToolGroupId[]): void {
-        this.disabledToolGroups = parseDisabledGroups([...groups]);
+        const next = parseDisabledGroups([...groups]);
+        // Only stamp on an actual change. Saving the form unchanged must not
+        // make every connected client refetch its tool list for nothing.
+        const changed =
+            next.length !== this.disabledToolGroups.length ||
+            next.some((id) => !this.disabledToolGroups.includes(id));
+
+        this.disabledToolGroups = next;
+        if (changed) {
+            this.toolSettingsUpdatedAt = Date.now();
+        }
         this.persist();
     }
 
@@ -303,6 +327,9 @@ export class AccountManager {
             // what earlier versions wrote.
             ...(this.disabledToolGroups.length > 0
                 ? { disabledToolGroups: [...this.disabledToolGroups] }
+                : {}),
+            ...(this.toolSettingsUpdatedAt !== undefined
+                ? { toolSettingsUpdatedAt: this.toolSettingsUpdatedAt }
                 : {}),
         };
     }

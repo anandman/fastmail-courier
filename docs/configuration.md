@@ -32,7 +32,8 @@ Detailed configuration options for Fastmail Courier.
 | `MCP_REFRESH_TOKEN_TTL` | No | MCP refresh token lifetime in seconds (default 2592000) |
 | `MCP_OAUTH_CLIENTS_FILE` | No | Registered MCP client store (defaults beside the vault file) |
 | `MCP_SERVICE_DOCUMENTATION_URL` | No | Advertised in metadata as `resource_documentation` (omitted if unset) |
-| `MCP_ACCESS_LOG` | No | Set `1` to log method, path, status, duration and source IP |
+| `MCP_ACCESS_LOG` | No | Set `1` to log method, path, status, duration and source IP, plus one line per MCP handshake |
+| `MCP_TOOL_LOG` | No | Set `1` to log one line per tool call: name, argument *keys*, duration, outcome |
 | `MCP_UI_SESSION_SECRET` | No | HMAC secret for UI sessions (defaults to `FASTMAIL_VAULT_KEY`) |
 | `MCP_UI_SESSION_TTL` | No | UI session TTL in seconds (default 604800) |
 | `MCP_AUTH_PROXY_EMAIL_HEADER` | No | Header name for proxy-auth email (default `x-auth-email`) |
@@ -70,6 +71,28 @@ need also leaves more room in the model's context for the ones you do.
 The preference is stored with the user's accounts as `disabledToolGroups`. An
 absent value means everything is enabled, so existing configs need no migration
 and groups added in future versions are on by default.
+
+Clients cache the tool list, so changing this does not take effect immediately.
+Courier emits `notifications/tools/list_changed` on the next request a stale
+client makes, which prompts a well-behaved client to refetch. That notification
+rides an in-flight request — the HTTP transport is stateless and has no standing
+connection to push on — so it arrives one turn late, and a client that ignores
+it simply keeps the stale list until it reconnects. The call-time refusal is
+what guarantees a hidden tool cannot be used regardless.
+
+## Authorized Clients
+
+Every MCP client that completes a sign-in is recorded against the identity that
+authorized it and listed under **Authorized clients** in the setup UI, with when
+it was authorized and when it was last used.
+
+**Revoke** removes it. Its refresh token stops working immediately, and its
+existing access token stops working on its next request — `verifyAccessToken`
+confirms the client still exists, so there is no window where a revoked client
+keeps working until its token expires. The client must sign in again to return.
+
+Clients authorized before Courier recorded ownership appear in a separate group;
+they cannot be attributed retroactively, and re-authorizing one adopts it.
 
 ## Config File
 

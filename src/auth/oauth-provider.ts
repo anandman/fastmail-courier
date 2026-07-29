@@ -237,6 +237,12 @@ export class CourierOAuthProvider implements OAuthServerProvider {
         // RFC 7591, and a token afterwards proves only that someone holds it.
         await this.options.clientsStore.promoteClient(entry.clientId, entry.userId);
 
+        // Naming the grant matters more than it looks. Both grants log an
+        // identical `POST /token -> 200`, and reading a refresh as a completed
+        // sign-in makes a client look healthier than it is -- it hides the fact
+        // that no new authorization has succeeded in days.
+        console.log(`[auth] issued tokens to ${entry.clientId} for ${entry.userId} via authorization_code`);
+
         return tokens as OAuthTokens;
     }
 
@@ -273,6 +279,8 @@ export class CourierOAuthProvider implements OAuthServerProvider {
             clientId: verified.clientId,
             scopes: granted,
         });
+
+        console.log(`[auth] issued tokens to ${verified.clientId} for ${verified.userId} via refresh_token`);
 
         return tokens as OAuthTokens;
     }

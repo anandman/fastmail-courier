@@ -2,6 +2,34 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type express from 'express';
 
 import { createMcpServer } from './mcp-server.js';
+import { getRequestContext } from './request-context.js';
+
+const INITIALIZE_LOG_ENABLED =
+    process.env.MCP_ACCESS_LOG === '1' || process.env.MCP_ACCESS_LOG === 'true';
+
+/**
+ * Logs the MCP handshake, reading it from the raw body rather than the server's
+ * `oninitialized` hook.
+ *
+ * In stateless mode the `initialized` notification arrives as a separate HTTP
+ * request, and therefore reaches a brand-new Server that never saw the
+ * `initialize` it acknowledges -- so the hook fires with no client info at all.
+ * The body is the only place the client actually names itself.
+ */
+function logInitialize(body: unknown): void {
+    if (!INITIALIZE_LOG_ENABLED) return;
+
+    const message = body as { method?: unknown; params?: { clientInfo?: unknown; protocolVersion?: unknown } };
+    if (message?.method !== 'initialize') return;
+
+    const info = message.params?.clientInfo as { name?: string; version?: string } | undefined;
+    const clientId = getRequestContext()?.authInfo?.clientId;
+    console.log(
+        `[mcp] initialize from ${info?.name ?? 'unnamed'}${info?.version ? ` ${info.version}` : ''}` +
+            ` protocol=${String(message.params?.protocolVersion ?? 'unspecified')}` +
+            `${clientId ? ` client=${clientId}` : ''}`
+    );
+}
 
 /**
  * Handles one Streamable HTTP request with an isolated stateless MCP connection.
@@ -30,6 +58,7 @@ export async function handleStatelessMcpRequest(
     });
 
     try {
+        logInitialize(req.body);
         await server.connect(transport);
         await transport.handleRequest(req, res, req.body);
     } finally {
