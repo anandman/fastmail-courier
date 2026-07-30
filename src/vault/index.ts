@@ -2,7 +2,7 @@ import type { VaultStore } from './types.js';
 import { FileVaultStore } from './file-vault.js';
 
 export function createVaultStore(): VaultStore {
-    const backend = (process.env.FASTMAIL_VAULT_BACKEND ?? 'file').toLowerCase();
+    const backend = (process.env.COURIER_VAULT_BACKEND ?? 'file').toLowerCase();
     if (backend === 'file') {
         return new FileVaultStore();
     }

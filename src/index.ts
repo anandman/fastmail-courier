@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Fastmail MCP Server
+ * Email Courier
  * 
- * An MCP server that provides email tools for Fastmail via JMAP protocol.
+ * An MCP server providing email, contacts, calendar and task tools over JMAP and CalDAV.
  * Works with Claude CLI, Gemini CLI, and other MCP-compatible clients.
  */
 
@@ -66,16 +66,16 @@ function parseSeconds(value: string | undefined, fallback: number): number {
 /**
  * Registered MCP clients are kept beside the vault but in their own file: they
  * churn far more than account configs, and that churn should never rewrite the
- * file holding Fastmail API tokens.
+ * file holding mail-provider API tokens.
  */
 function resolveClientsFilePath(): string {
     const explicit = process.env.MCP_OAUTH_CLIENTS_FILE;
     if (explicit) return resolve(explicit);
 
-    const vaultFile = process.env.FASTMAIL_VAULT_FILE;
+    const vaultFile = process.env.COURIER_VAULT_FILE;
     if (vaultFile) return join(dirname(resolve(vaultFile)), 'oauth-clients.json');
 
-    return join(homedir(), '.config', 'fastmail-courier', 'oauth-clients.json');
+    return join(homedir(), '.config', 'email-courier', 'oauth-clients.json');
 }
 
 /**
@@ -255,7 +255,7 @@ async function startHttpServer() {
                 secret:
                     process.env.MCP_TOKEN_SECRET ??
                     process.env.MCP_UI_SESSION_SECRET ??
-                    process.env.FASTMAIL_VAULT_KEY ??
+                    process.env.COURIER_VAULT_KEY ??
                     '',
                 accessTokenTtlSeconds: parseSeconds(process.env.MCP_ACCESS_TOKEN_TTL, 3600),
                 refreshTokenTtlSeconds: parseSeconds(process.env.MCP_REFRESH_TOKEN_TTL, 30 * 24 * 3600),
@@ -443,7 +443,7 @@ async function startHttpServer() {
         }
 
         const ttlSeconds = Number.parseInt(process.env.MCP_UI_SESSION_TTL ?? '604800', 10);
-        const sessionSecret = process.env.MCP_UI_SESSION_SECRET ?? process.env.FASTMAIL_VAULT_KEY ?? '';
+        const sessionSecret = process.env.MCP_UI_SESSION_SECRET ?? process.env.COURIER_VAULT_KEY ?? '';
         if (!sessionSecret) {
             res.status(500).send('MCP_UI_SESSION_SECRET is required');
             return;
@@ -686,7 +686,7 @@ async function startHttpServer() {
     });
 
     app.listen(port, host, () => {
-        console.log(`Fastmail Courier listening on http://${host}:${port}${path}`);
+        console.log(`Email Courier listening on http://${host}:${port}${path}`);
     });
 }
 
@@ -737,7 +737,7 @@ function resolveUiUser(req: express.Request, authMode: 'oidc' | 'proxy' | 'none'
     }
 
     if (authMode === 'oidc') {
-        const sessionSecret = process.env.MCP_UI_SESSION_SECRET ?? process.env.FASTMAIL_VAULT_KEY ?? '';
+        const sessionSecret = process.env.MCP_UI_SESSION_SECRET ?? process.env.COURIER_VAULT_KEY ?? '';
         if (!sessionSecret) {
             return null;
         }

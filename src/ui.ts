@@ -710,7 +710,7 @@ function centerPage(title: string, message: string, action = ''): string {
 export function renderLoginPage(authMode: AuthMode): string {
     if (authMode === 'proxy') {
         return documentShell(
-            'Fastmail Courier',
+            'Email Courier',
             `<main class="center-card">
               ${brandMark()}
               <h1>Authentication required</h1>
@@ -722,8 +722,8 @@ export function renderLoginPage(authMode: AuthMode): string {
 
     if (authMode === 'oidc') {
         return centerPage(
-            'Fastmail Courier',
-            'Connect and manage the Fastmail accounts available to your private MCP service.',
+            'Email Courier',
+            'Connect and manage the accounts available to your private MCP service.',
             `<a class="button primary" href="/auth/login">
               ${checkIcon}
               Continue securely
@@ -732,7 +732,7 @@ export function renderLoginPage(authMode: AuthMode): string {
     }
 
     return documentShell(
-        'Fastmail Courier',
+        'Email Courier',
         `<main class="center-card">
           ${brandMark()}
           <h1>Setup unavailable</h1>
@@ -744,12 +744,12 @@ export function renderLoginPage(authMode: AuthMode): string {
 
 export function renderNoVaultPage(): string {
     return documentShell(
-        'Fastmail Courier',
+        'Email Courier',
         `<main class="center-card">
           ${brandMark()}
           <h1>Encrypted storage unavailable</h1>
           <p>Courier cannot save account credentials until its encrypted vault is configured.</p>
-          <div class="notice">Set <strong>FASTMAIL_VAULT_KEY</strong> and restart the service.</div>
+          <div class="notice">Set <strong>COURIER_VAULT_KEY</strong> and restart the service.</div>
         </main>`
     );
 }
@@ -828,7 +828,7 @@ export function renderUiPage(
         `<div class="empty">
           <span class="empty-icon">${envelopeIcon}</span>
           <strong>No accounts connected</strong>
-          <p>Add a Fastmail account to make mail, contacts, calendars, and tasks available to your MCP clients.</p>
+          <p>Add an account to make mail, contacts, calendars, and tasks available to your MCP clients.</p>
         </div>`;
 
     const enabledGroups = TOOL_GROUPS.filter((group) => !disabledToolGroups.includes(group.id));
@@ -891,13 +891,13 @@ export function renderUiPage(
     const hasStoredCaldavPassword = Boolean(selectedAccount?.caldav?.password);
 
     return documentShell(
-        'Fastmail Courier Setup',
+        'Email Courier Setup',
         `<main class="shell">
           <header class="topbar">
             <div class="brand">
               ${brandMark()}
               <div class="brand-copy">
-                <p class="brand-name">Fastmail Courier</p>
+                <p class="brand-name">Email Courier</p>
                 <p class="brand-tagline">Private MCP account gateway</p>
               </div>
             </div>
@@ -912,7 +912,7 @@ export function renderUiPage(
 
           <section class="hero">
             <p class="eyebrow">Account setup</p>
-            <h1>Your Fastmail, delivered securely.</h1>
+            <h1>Your mail, delivered securely.</h1>
             <p>Connect accounts once. Courier encrypts their credentials at rest and keeps each authenticated MCP user isolated.</p>
           </section>
 
@@ -934,14 +934,14 @@ export function renderUiPage(
                   <h2 id="account-form-heading">${editing ? 'Update account' : 'Add an account'}</h2>
                   <p class="card-intro">${editing
                       ? 'Leave either credential blank to keep its current value.'
-                      : 'Connect another Fastmail account to Courier.'}</p>
+                      : 'Connect another account to Email Courier.'}</p>
                 </div>
               </div>
 
               <form method="post" action="/ui/account">
                 <div class="form-grid">
                   <div class="field">
-                    <label for="email">Fastmail email</label>
+                    <label for="email">Account email</label>
                     <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" value="${selectedEmail}" ${editing ? 'readonly' : ''} required />
                   </div>
 

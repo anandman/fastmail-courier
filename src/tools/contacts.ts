@@ -54,7 +54,7 @@ export async function listAddressBooks() {
     const manager = getAccountManager();
     const account = manager.getCurrentAccount();
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
@@ -75,7 +75,7 @@ export async function searchContacts(params: z.infer<typeof searchContactsSchema
     const manager = getAccountManager();
     const account = manager.getCurrentAccount();
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
@@ -94,7 +94,7 @@ export async function getContact(params: z.infer<typeof getContactSchema>) {
     const manager = getAccountManager();
     const account = manager.getCurrentAccount();
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
@@ -110,7 +110,7 @@ export async function createContact(params: z.infer<typeof createContactSchema>)
     const manager = getAccountManager();
     const account = manager.getCurrentAccount();
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
@@ -159,7 +159,7 @@ export async function updateContact(params: z.infer<typeof updateContactSchema>)
     const manager = getAccountManager();
     const account = manager.getCurrentAccount();
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
@@ -240,7 +240,7 @@ export async function deleteContact(params: z.infer<typeof deleteContactSchema>)
     const manager = getAccountManager();
     const account = manager.getCurrentAccount();
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);

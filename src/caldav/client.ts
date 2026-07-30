@@ -1,7 +1,7 @@
 /**
- * Fastmail CalDAV Client
+ * CalDAV Client
  * 
- * A CalDAV client for accessing Fastmail calendars and tasks (VTODO).
+ * A CalDAV client for accessing calendars and tasks (VTODO).
  * Uses the tsdav library for CalDAV protocol operations.
  */
 
@@ -21,12 +21,12 @@ import type {
     EventUpdate,
 } from './types.js';
 
-const FASTMAIL_CALDAV_URL = 'https://caldav.fastmail.com';
+const DEFAULT_CALDAV_URL = 'https://caldav.fastmail.com';
 
 /**
- * CalDAV client for Fastmail calendars and tasks
+ * CalDAV client for calendars and tasks
  */
-export class FastmailCalDAVClient {
+export class CalDAVClient {
     private config: CalDAVConfig;
     private client: DAVClient | null = null;
     private connected = false;
@@ -34,7 +34,7 @@ export class FastmailCalDAVClient {
     constructor(config: CalDAVConfig) {
         this.config = {
             ...config,
-            serverUrl: config.serverUrl || FASTMAIL_CALDAV_URL,
+            serverUrl: config.serverUrl || DEFAULT_CALDAV_URL,
         };
     }
 
@@ -567,7 +567,7 @@ export class FastmailCalDAVClient {
         const lines: string[] = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
-            'PRODID:-//Fastmail Courier//CalDAV Client//EN',
+            'PRODID:-//Email Courier//CalDAV Client//EN',
             'BEGIN:VTODO',
             `UID:${uid}`,
             `DTSTAMP:${timestamp}`,
@@ -673,7 +673,7 @@ export class FastmailCalDAVClient {
         // Generate a unique identifier for new tasks
         const random = Math.random().toString(36).substring(2, 15);
         const timestamp = Date.now().toString(36);
-        return `${timestamp}-${random}@fastmail-courier`;
+        return `${timestamp}-${random}@email-courier`;
     }
 
     private formatICalDate(date: Date): string {
@@ -822,7 +822,7 @@ export class FastmailCalDAVClient {
         const lines: string[] = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
-            'PRODID:-//Fastmail Courier//CalDAV Client//EN',
+            'PRODID:-//Email Courier//CalDAV Client//EN',
             'BEGIN:VEVENT',
             `UID:${uid}`,
             `DTSTAMP:${timestamp}`,
@@ -906,14 +906,14 @@ export class FastmailCalDAVClient {
 }
 
 // Client cache for connection reuse
-const clientCache = new Map<string, FastmailCalDAVClient>();
+const clientCache = new Map<string, CalDAVClient>();
 
-export function getCalDAVClient(config: CalDAVConfig): FastmailCalDAVClient {
+export function getCalDAVClient(config: CalDAVConfig): CalDAVClient {
     const key = config.username;
     let client = clientCache.get(key);
 
     if (!client) {
-        client = new FastmailCalDAVClient(config);
+        client = new CalDAVClient(config);
         clientCache.set(key, client);
     }
 

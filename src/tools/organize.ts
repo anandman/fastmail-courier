@@ -42,7 +42,7 @@ export async function moveEmails(
     const account = manager.getCurrentAccount();
 
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     if (params.emailIds.length === 0) {
@@ -84,7 +84,7 @@ export async function deleteEmails(
     const account = manager.getCurrentAccount();
 
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     if (params.emailIds.length === 0) {
@@ -119,7 +119,7 @@ export async function markEmails(
     const account = manager.getCurrentAccount();
 
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     if (params.emailIds.length === 0) {
@@ -173,7 +173,7 @@ export async function tagEmails(
     const account = manager.getCurrentAccount();
 
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     if (params.emailIds.length === 0) {

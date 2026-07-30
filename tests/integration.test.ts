@@ -1,5 +1,5 @@
 /**
- * Integration tests for Fastmail MCP Server
+ * Integration tests for Email Courier
  * 
  * These tests run against real Fastmail accounts.
  * Configure your test accounts in .env.test (copy from .env.test.example)
@@ -33,7 +33,7 @@ import {
     deleteContact,
 } from '../src/tools/index.js';
 
-describe('Fastmail MCP Server', () => {
+describe('Email Courier', () => {
     beforeAll(() => {
         if (!testConfig.isConfigured) {
             throw new Error(
@@ -42,8 +42,8 @@ describe('Fastmail MCP Server', () => {
         }
 
         // Set up environment for tests
-        process.env.FASTMAIL_API_TOKEN = testConfig.token1;
-        process.env.FASTMAIL_EMAIL = testConfig.account1;
+        process.env.COURIER_API_TOKEN = testConfig.token1;
+        process.env.COURIER_EMAIL = testConfig.account1;
 
         // Reset singletons
         resetAccountManager();
@@ -52,8 +52,8 @@ describe('Fastmail MCP Server', () => {
 
     afterAll(() => {
         // Clean up
-        delete process.env.FASTMAIL_API_TOKEN;
-        delete process.env.FASTMAIL_EMAIL;
+        delete process.env.COURIER_API_TOKEN;
+        delete process.env.COURIER_EMAIL;
         resetAccountManager();
         clearClientCache();
     });
@@ -190,7 +190,7 @@ describe('Fastmail MCP Server', () => {
             const result = await sendEmail({
                 to: testConfig.recipient,
                 subject: `MCP Test Email - ${new Date().toISOString()}`,
-                body: 'This is a test email from Fastmail MCP Server integration tests.',
+                body: 'This is a test email from Email Courier integration tests.',
             });
 
             expect(result.success).toBe(true);

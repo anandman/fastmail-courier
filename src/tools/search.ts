@@ -33,7 +33,7 @@ export async function searchEmails(
     const account = manager.getCurrentAccount();
 
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);

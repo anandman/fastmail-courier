@@ -1,12 +1,14 @@
-# Fastmail Courier
+# Email Courier
 
-An MCP server that connects AI assistants to your Fastmail email, calendar, and tasks.
+An MCP server that connects AI assistants to your email, contacts, calendar, and
+tasks — over JMAP for mail and contacts, CalDAV for calendar and tasks. Tested
+against Fastmail; works with any JMAP provider.
 
 ## Quick Install
 
 ```bash
-git clone https://github.com/anandman/fastmail-courier.git
-cd fastmail-courier
+git clone https://github.com/anandman/email-courier.git
+cd email-courier
 npm install
 npm run build
 ```
@@ -16,12 +18,12 @@ npm run build
 1. **Get API token:** Fastmail → Settings → Privacy & Security → Integrations → API tokens
 2. **Set environment:**
    ```bash
-   export FASTMAIL_API_TOKEN="fmu1-your-token"
-   export FASTMAIL_EMAIL="you@fastmail.com"
+   export COURIER_API_TOKEN="fmu1-your-token"
+   export COURIER_EMAIL="you@fastmail.com"
    ```
 3. **Add to a client.** Claude Code:
    ```bash
-   claude mcp add fastmail-courier -- node /path/to/fastmail-courier/dist/index.js
+   claude mcp add email-courier -- node /path/to/email-courier/dist/index.js
    ```
    Claude Desktop (`claude_desktop_config.json`) and Codex
    (`~/.codex/config.toml`) take the same command and path in their own formats
@@ -29,7 +31,7 @@ npm run build
 
 ## Remote Hosting (Optional)
 
-Fastmail Courier defaults to local `stdio` transport. To host it remotely over Streamable HTTP:
+Email Courier defaults to local `stdio` transport. To host it remotely over Streamable HTTP:
 
 ```bash
 export MCP_TRANSPORT="http"
@@ -49,7 +51,7 @@ export MCP_OIDC_CLIENT_ID="your-client-id"
 export MCP_OIDC_CLIENT_SECRET="your-client-secret"
 export MCP_ALLOWED_USERS="you@example.com,partner@example.com"
 export MCP_TOKEN_SECRET="$(openssl rand -hex 32)"
-export FASTMAIL_VAULT_KEY="base64-or-hex-32-byte-key"
+export COURIER_VAULT_KEY="base64-or-hex-32-byte-key"
 ```
 
 In this mode Courier is its own OAuth authorization server: MCP clients register

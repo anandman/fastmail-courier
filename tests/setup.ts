@@ -9,9 +9,9 @@ import { join } from 'node:path';
 
 // .env.test holds live Fastmail tokens, so it lives outside the source tree —
 // the repo is inside a synced Dropbox folder and .gitignore does not stop that.
-const DEFAULT_TEST_ENV_PATH = join(homedir(), '.local', 'state', 'fastmail-courier', '.env.test');
+const DEFAULT_TEST_ENV_PATH = join(homedir(), '.local', 'state', 'email-courier', '.env.test');
 
-const envPath = [process.env.FASTMAIL_TEST_ENV_FILE, DEFAULT_TEST_ENV_PATH].find(
+const envPath = [process.env.COURIER_TEST_ENV_FILE, DEFAULT_TEST_ENV_PATH].find(
     (candidate): candidate is string => !!candidate && existsSync(candidate)
 );
 

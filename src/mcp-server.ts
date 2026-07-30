@@ -32,7 +32,7 @@ function logToolCall(name: string, args: unknown, startedAt: number, error?: str
 export function createMcpServer(): Server {
     const server = new Server(
         {
-            name: 'fastmail-courier',
+            name: 'email-courier',
             version: '1.0.0',
         },
         {

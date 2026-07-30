@@ -122,7 +122,7 @@ const accountSelectorSchema = z.string()
     .min(1)
     .optional()
     .describe(
-        'Fastmail account to use for this call (display name or email). Defaults to the configured default account.'
+        'Account to use for this call (display name or email). Defaults to the configured default account.'
     );
 
 const accountSelectionSchema = z.object({
@@ -178,13 +178,13 @@ const baseTools: ToolDefinition[] = [
     {
         name: 'switch_account',
         description:
-            'Select a Fastmail account in the current client context. In stateless HTTP, pass account directly to the target tool instead.',
+            'Select an account in the current client context. In stateless HTTP, pass account directly to the target tool instead.',
         inputSchema: switchAccountSchema,
         handler: (params) => switchAccount(switchAccountSchema.parse(params)),
     },
     {
         name: 'get_current_account',
-        description: 'Get the currently active Fastmail account (lightweight).',
+        description: 'Get the currently active account (lightweight).',
         inputSchema: getCurrentAccountSchema,
         handler: getCurrentAccount,
     },

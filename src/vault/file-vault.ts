@@ -12,7 +12,7 @@ interface VaultFileData {
     users: Record<string, EncryptedPayload>;
 }
 
-const DEFAULT_VAULT_PATH = join(homedir(), '.config', 'fastmail-courier', 'vault.json');
+const DEFAULT_VAULT_PATH = join(homedir(), '.config', 'email-courier', 'vault.json');
 const mutationQueues = new Map<string, Promise<void>>();
 
 async function enqueueMutation<T>(filePath: string, mutation: () => Promise<T>): Promise<T> {
@@ -35,13 +35,13 @@ async function enqueueMutation<T>(filePath: string, mutation: () => Promise<T>):
 }
 
 function loadVaultKey(): Buffer {
-    const keyValue = process.env.FASTMAIL_VAULT_KEY;
+    const keyValue = process.env.COURIER_VAULT_KEY;
     if (!keyValue) {
-        throw new Error('FASTMAIL_VAULT_KEY is required for encrypted vault storage');
+        throw new Error('COURIER_VAULT_KEY is required for encrypted vault storage');
     }
     const key = parseVaultKey(keyValue);
     if (key.length !== 32) {
-        throw new Error('FASTMAIL_VAULT_KEY must be 32 bytes (base64 or hex)');
+        throw new Error('COURIER_VAULT_KEY must be 32 bytes (base64 or hex)');
     }
     return key;
 }
@@ -51,7 +51,7 @@ export class FileVaultStore implements VaultStore {
     private key: Buffer;
 
     constructor(filePath?: string) {
-        this.filePath = resolve(filePath || process.env.FASTMAIL_VAULT_FILE || DEFAULT_VAULT_PATH);
+        this.filePath = resolve(filePath || process.env.COURIER_VAULT_FILE || DEFAULT_VAULT_PATH);
         this.key = loadVaultKey();
     }
 

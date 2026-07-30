@@ -26,7 +26,7 @@ export async function listMailboxes(): Promise<{
     const account = manager.getCurrentAccount();
 
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
@@ -88,7 +88,7 @@ export async function createMailbox(params: z.infer<typeof createMailboxSchema>)
     const manager = getAccountManager();
     const account = manager.getCurrentAccount();
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
@@ -115,7 +115,7 @@ export async function renameMailbox(params: z.infer<typeof renameMailboxSchema>)
     const manager = getAccountManager();
     const account = manager.getCurrentAccount();
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
@@ -138,7 +138,7 @@ export async function deleteMailbox(params: z.infer<typeof deleteMailboxSchema>)
     const manager = getAccountManager();
     const account = manager.getCurrentAccount();
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
@@ -160,7 +160,7 @@ export async function moveMailbox(params: z.infer<typeof moveMailboxSchema>) {
     const manager = getAccountManager();
     const account = manager.getCurrentAccount();
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
@@ -182,7 +182,7 @@ export async function getMailboxDetails(params: z.infer<typeof getMailboxDetails
     const manager = getAccountManager();
     const account = manager.getCurrentAccount();
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
@@ -218,7 +218,7 @@ export async function setMailboxRole(params: z.infer<typeof setMailboxRoleSchema
     const manager = getAccountManager();
     const account = manager.getCurrentAccount();
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);

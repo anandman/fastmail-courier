@@ -19,7 +19,7 @@ function getClient() {
 
     if (!config) {
         throw new Error(
-            'CalDAV is not configured. Please set FASTMAIL_CALDAV_PASSWORD environment variable or add caldav configuration to your accounts.json file.'
+            'CalDAV is not configured. Please set COURIER_CALDAV_PASSWORD environment variable or add caldav configuration to your accounts.json file.'
         );
     }
 

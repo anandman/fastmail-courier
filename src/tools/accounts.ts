@@ -85,7 +85,7 @@ export async function getCurrentAccount(): Promise<{
         return {
             accountName: null,
             hasAccounts: false,
-            message: `No accounts configured. Set FASTMAIL_API_TOKEN environment variable or create ${manager.getConfigFilePath()}`,
+            message: `No accounts configured. Set COURIER_API_TOKEN environment variable or create ${manager.getConfigFilePath()}`,
         };
     }
 

@@ -1,14 +1,14 @@
 # Architecture
 
-This document describes the design of Fastmail Courier for contributors and AI assistants.
+This document describes the design of Email Courier for contributors and AI assistants.
 
 ## Overview
 
-Fastmail Courier is an MCP server that bridges AI assistants (Claude, Gemini) with Fastmail's email, calendar, and task services.
+Email Courier is an MCP server that bridges AI assistants (Claude, Gemini) with Fastmail's email, calendar, and task services.
 
 ```
 ┌─────────────────┐      MCP       ┌───────────────────┐      JMAP      ┌──────────────┐
-│  AI Assistant   │◄──────────────►│  Fastmail Courier │◄──────────────►│   Fastmail   │
+│  AI Assistant   │◄──────────────►│  Email Courier │◄──────────────►│   Fastmail   │
 │ (Claude/Gemini) │                │    (MCP Server)   │◄──────────────►│   Services   │
 └─────────────────┘                └───────────────────┘     CalDAV     └──────────────┘
 ```
@@ -40,15 +40,16 @@ Fastmail Courier is an MCP server that bridges AI assistants (Claude, Gemini) wi
 
 ### Why Two Protocols?
 
-- Fastmail's JMAP doesn't include calendar/contacts (yet)
-- CalDAV is the de facto standard for calendar sync
-- No unified Fastmail API exists for all services
+- JMAP for Contacts (RFC 9610, Dec 2024) is ratified, so contacts go over JMAP
+- JMAP for Calendars is still an Internet-Draft (`draft-ietf-jmap-calendars`),
+  so calendar and tasks go over CalDAV until providers expose it
+- CalDAV is the de facto standard for calendar sync in the meantime
 
 ## Authentication Model
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│                    Fastmail Courier                           │
+│                    Email Courier                           │
 ├───────────────────────────────────────────────────────────────┤
 │                                                               │
 │  JMAP Client                       CalDAV Client              │

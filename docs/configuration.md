@@ -1,15 +1,15 @@
 # Configuration
 
-Detailed configuration options for Fastmail Courier.
+Detailed configuration options for Email Courier.
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `FASTMAIL_API_TOKEN` | Yes | JMAP API token (starts with `fmu1-`) |
-| `FASTMAIL_EMAIL` | Yes* | Your Fastmail email address |
-| `FASTMAIL_CALDAV_PASSWORD` | No | App password for calendar/tasks |
-| `FASTMAIL_CALDAV_USERNAME` | No | CalDAV username (defaults to the account email) |
+| `COURIER_API_TOKEN` | Yes | JMAP API token (starts with `fmu1-`) |
+| `COURIER_EMAIL` | Yes* | Your Fastmail email address |
+| `COURIER_CALDAV_PASSWORD` | No | App password for calendar/tasks |
+| `COURIER_CALDAV_USERNAME` | No | CalDAV username (defaults to the account email) |
 | `MCP_TRANSPORT` | No | `stdio` (default) or `http` for Streamable HTTP hosting |
 | `MCP_HTTP_HOST` | No | Host to bind for HTTP transport (default `127.0.0.1`) |
 | `MCP_HTTP_PORT` | No | Port for HTTP transport (default `3333`) |
@@ -34,13 +34,13 @@ Detailed configuration options for Fastmail Courier.
 | `MCP_SERVICE_DOCUMENTATION_URL` | No | Advertised in metadata as `resource_documentation` (omitted if unset) |
 | `MCP_ACCESS_LOG` | No | Set `1` to log method, path, status, duration and source IP, plus one line per MCP handshake |
 | `MCP_TOOL_LOG` | No | Set `1` to log one line per tool call: name, argument *keys*, duration, outcome |
-| `MCP_UI_SESSION_SECRET` | No | HMAC secret for UI sessions (defaults to `FASTMAIL_VAULT_KEY`) |
+| `MCP_UI_SESSION_SECRET` | No | HMAC secret for UI sessions (defaults to `COURIER_VAULT_KEY`) |
 | `MCP_UI_SESSION_TTL` | No | UI session TTL in seconds (default 604800) |
 | `MCP_AUTH_PROXY_EMAIL_HEADER` | No | Header name for proxy-auth email (default `x-auth-email`) |
 | `MCP_AUTH_PROXY_SUB_HEADER` | No | Header name for proxy-auth subject (default `x-auth-user`) |
-| `FASTMAIL_VAULT_BACKEND` | No | Vault backend (`file` default) |
-| `FASTMAIL_VAULT_FILE` | No | Vault file path (default `~/.config/fastmail-courier/vault.json`) |
-| `FASTMAIL_VAULT_KEY` | No | 32-byte vault key (base64 or hex) for encrypted storage |
+| `COURIER_VAULT_BACKEND` | No | Vault backend (`file` default) |
+| `COURIER_VAULT_FILE` | No | Vault file path (default `~/.config/email-courier/vault.json`) |
+| `COURIER_VAULT_KEY` | No | 32-byte vault key (base64 or hex) for encrypted storage |
 
 *Required if using environment variables; inferred from token discovery if using config file.
 
@@ -56,12 +56,12 @@ provider-specific logout endpoint.
 ## Available Tools (per user)
 
 Courier exposes 36 tools in four feature groups — **Email** (15), **Contacts** (6),
-**Calendar** (6) and **Fastmail Tasks** (6) — plus three account tools that are
+**Calendar** (6) and **Tasks** (6) — plus three account tools that are
 always available, since they are how clients discover and target accounts.
 
 Each signed-in identity chooses which groups to expose, under **Advanced —
 available tools** in the setup UI. This is a per-user preference rather than
-server configuration: one person may never use Fastmail Tasks while another
+server configuration: one person may never use tasks while another
 relies on them, and both are served by the same Courier.
 
 A hidden group is omitted from `tools/list` *and* refused if called, so a client
@@ -96,7 +96,7 @@ they cannot be attributed retroactively, and re-authorizing one adopts it.
 
 ## Config File
 
-Location: `~/.config/fastmail-courier/accounts.json`
+Location: `~/.config/email-courier/accounts.json`
 
 ### Single Account
 
@@ -196,8 +196,8 @@ CalDAV is used for calendar events and tasks. It requires an **app password**, n
 If you only need calendar features:
 
 ```bash
-export FASTMAIL_EMAIL="you@fastmail.com"
-export FASTMAIL_CALDAV_PASSWORD="your-app-password"
+export COURIER_EMAIL="you@fastmail.com"
+export COURIER_CALDAV_PASSWORD="your-app-password"
 ```
 
 Note: You'll still need the JMAP token for email features.
@@ -210,7 +210,7 @@ Note: You'll still need the JMAP token for email features.
 
 ## Remote Hosting (Streamable HTTP)
 
-To run Fastmail Courier as a remote HTTP server (while keeping local `stdio` as the default), set:
+To run Email Courier as a remote HTTP server (while keeping local `stdio` as the default), set:
 
 ```bash
 export MCP_TRANSPORT="http"
@@ -299,8 +299,8 @@ export MCP_ALLOWED_USERS="you@example.com,wife@example.com"
 Remote mode stores Fastmail credentials per user in an encrypted vault.
 
 ```bash
-export FASTMAIL_VAULT_KEY="base64-or-hex-32-byte-key"
-export FASTMAIL_VAULT_FILE="/data/fastmail-courier/vault.json"
+export COURIER_VAULT_KEY="base64-or-hex-32-byte-key"
+export COURIER_VAULT_FILE="/data/email-courier/vault.json"
 ```
 
 The key must be 32 bytes (base64 or 64 hex chars). Store it securely (env var or secret manager).

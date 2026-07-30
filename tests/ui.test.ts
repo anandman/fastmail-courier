@@ -6,7 +6,7 @@ describe('setup UI', () => {
     it('renders a styled OIDC login page', () => {
         const html = renderLoginPage('oidc');
 
-        expect(html).toContain('Fastmail Courier');
+        expect(html).toContain('Email Courier');
         expect(html).toContain('Continue securely');
         expect(html).toContain('href="/auth/login"');
         expect(html).toContain('Content-Security-Policy');
@@ -73,6 +73,6 @@ describe('setup UI', () => {
         expect(renderLoginPage('proxy')).toContain('Authentication required');
         expect(renderLoginPage('none')).toContain('Setup unavailable');
         expect(renderNoVaultPage()).toContain('Encrypted storage unavailable');
-        expect(renderNoVaultPage()).toContain('FASTMAIL_VAULT_KEY');
+        expect(renderNoVaultPage()).toContain('COURIER_VAULT_KEY');
     });
 });

@@ -1,6 +1,6 @@
 # Examples
 
-Common prompts and workflows for Fastmail Courier.
+Common prompts and workflows for Email Courier.
 
 ## Email Prompts
 

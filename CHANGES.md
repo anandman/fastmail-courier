@@ -1,5 +1,33 @@
 # Unreleased Changes (vs. GitHub `main` @ `2a0a636`)
 
+## Breaking: renamed to Email Courier
+
+The project was **Fastmail Courier**; it is now **Email Courier**. Fastmail asked
+that their trademark not appear in a third-party client's name, and the server was
+in any case never Fastmail-specific — it speaks JMAP and CalDAV, and works with any
+JMAP provider.
+
+Nothing about the protocol behaviour changed. What you must update:
+
+| Was | Now |
+|---|---|
+| `FASTMAIL_API_TOKEN` | `COURIER_API_TOKEN` |
+| `FASTMAIL_EMAIL` | `COURIER_EMAIL` |
+| `FASTMAIL_CALDAV_USERNAME` | `COURIER_CALDAV_USERNAME` |
+| `FASTMAIL_CALDAV_PASSWORD` | `COURIER_CALDAV_PASSWORD` |
+| `FASTMAIL_VAULT_FILE` / `_KEY` / `_BACKEND` | `COURIER_VAULT_FILE` / `_KEY` / `_BACKEND` |
+| `FASTMAIL_TEST_ENV_FILE` | `COURIER_TEST_ENV_FILE` |
+| `~/.config/fastmail-courier/` | `~/.config/email-courier/` |
+| `~/.local/state/fastmail-courier/` | `~/.local/state/email-courier/` |
+| package `fastmail-courier`, bin `fastmail-mcp` | `email-courier`, bin `email-courier-mcp` |
+| exported `FastmailCalDAVClient` | `CalDAVClient` |
+
+**No backward-compatible aliases are provided.** The old variable names are not
+read at all, so a stale config fails loudly rather than silently falling back.
+
+Clients must be re-added: the name advertised over MCP changed from
+`fastmail-courier` to `email-courier`.
+
 ## Summary
 
 Three major areas of work since the last commit:
@@ -21,7 +49,7 @@ Three major areas of work since the last commit:
 | `src/vault/crypto.ts` | AES-256-GCM encrypt/decrypt for JSON payloads; vault key parsing (hex or base64) |
 | `src/vault/types.ts` | `VaultStore` interface (get/set/list user configs) |
 | `src/vault/index.ts` | Factory that returns the configured vault backend |
-| `src/vault/file-vault.ts` | File-based encrypted vault (`~/.config/fastmail-courier/vault.json`), atomic writes, chmod 0600 |
+| `src/vault/file-vault.ts` | File-based encrypted vault (`~/.config/email-courier/vault.json`), atomic writes, chmod 0600 |
 | `src/request-context.ts` | `AsyncLocalStorage`-based request context (account manager, auth info, user ID per request) |
 | `src/user-accounts.ts` | Factory to create an `AccountManager` for a specific user from vault-stored config |
 

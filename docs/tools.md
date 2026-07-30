@@ -1,6 +1,6 @@
 # Tools Reference
 
-Complete reference for all 34 MCP tools provided by Fastmail Courier.
+Complete reference for all 34 MCP tools provided by Email Courier.
 
 ## Token-Smart Usage
 

@@ -1,11 +1,11 @@
 {
-    "name": "fastmail-courier",
+    "name": "email-courier",
     "version": "1.0.0",
-    "description": "MCP server for Fastmail email integration via JMAP",
+    "description": "MCP server for email, contacts, calendars and tasks over JMAP and CalDAV",
     "type": "module",
     "main": "dist/index.js",
     "bin": {
-        "fastmail-mcp": "dist/index.js"
+        "email-courier-mcp": "dist/index.js"
     },
     "scripts": {
         "build": "tsc",

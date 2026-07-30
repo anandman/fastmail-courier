@@ -2,7 +2,7 @@
  * Feature groups for tool visibility.
  *
  * Which tools a user wants is a per-user question, not a per-deployment one:
- * one person may never touch Fastmail Tasks while another relies on them, and
+ * one person may never touch tasks while another relies on them, and
  * both are served by the same Courier. So this is a stored preference, exposed
  * in the setup UI, rather than server configuration.
  */
@@ -70,8 +70,8 @@ export const TOOL_GROUPS: ToolGroup[] = [
     },
     {
         id: 'tasks',
-        label: 'Fastmail Tasks',
-        description: 'Fastmail’s own task lists. Turn this off if you keep tasks somewhere else.',
+        label: 'Tasks',
+        description: 'Task lists from your calendar server. Turn this off if you keep tasks somewhere else.',
         tools: ['list_tasks', 'get_task', 'create_task', 'update_task', 'complete_task', 'delete_task'],
     },
 ];

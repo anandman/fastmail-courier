@@ -7,11 +7,11 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { testConfig } from './setup.js';
-import { FastmailCalDAVClient } from '../src/caldav/client.js';
+import { CalDAVClient } from '../src/caldav/client.js';
 import type { Task, Calendar } from '../src/caldav/types.js';
 
 describe('CalDAV Integration', () => {
-    let client: FastmailCalDAVClient;
+    let client: CalDAVClient;
     let testCalendarUrl: string;
     let createdTaskUrl: string | null = null;
 
@@ -21,7 +21,7 @@ describe('CalDAV Integration', () => {
             return;
         }
 
-        client = new FastmailCalDAVClient({
+        client = new CalDAVClient({
             username: testConfig.caldavUsername!,
             password: testConfig.caldavPassword!,
         });

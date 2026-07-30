@@ -28,13 +28,13 @@ function createConfig(userNumber: number): ExtendedMultiAccountConfig {
 
 describe('concurrent client state', () => {
     const temporaryDirectories: string[] = [];
-    const originalVaultKey = process.env.FASTMAIL_VAULT_KEY;
+    const originalVaultKey = process.env.COURIER_VAULT_KEY;
 
     afterEach(async () => {
         if (originalVaultKey === undefined) {
-            delete process.env.FASTMAIL_VAULT_KEY;
+            delete process.env.COURIER_VAULT_KEY;
         } else {
-            process.env.FASTMAIL_VAULT_KEY = originalVaultKey;
+            process.env.COURIER_VAULT_KEY = originalVaultKey;
         }
 
         await Promise.all(
@@ -45,7 +45,7 @@ describe('concurrent client state', () => {
     });
 
     it('preserves every update from simultaneous vault instances', async () => {
-        process.env.FASTMAIL_VAULT_KEY = VAULT_KEY;
+        process.env.COURIER_VAULT_KEY = VAULT_KEY;
         const directory = await mkdtemp(join(tmpdir(), 'fastmail-vault-concurrency-'));
         temporaryDirectories.push(directory);
         const vaultPath = join(directory, 'vault.json');
@@ -73,7 +73,7 @@ describe('concurrent client state', () => {
     });
 
     it('merges simultaneous updates to one user inside the vault transaction', async () => {
-        process.env.FASTMAIL_VAULT_KEY = VAULT_KEY;
+        process.env.COURIER_VAULT_KEY = VAULT_KEY;
         const directory = await mkdtemp(join(tmpdir(), 'fastmail-vault-user-concurrency-'));
         temporaryDirectories.push(directory);
         const vaultPath = join(directory, 'vault.json');

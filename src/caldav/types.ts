@@ -1,7 +1,7 @@
 /**
  * CalDAV Type Definitions
  * 
- * Types for CalDAV calendar and task (VTODO) operations with Fastmail.
+ * Types for CalDAV calendar and task (VTODO) operations.
  */
 
 // ============================================================================
@@ -12,7 +12,7 @@
  * Configuration for CalDAV connection
  */
 export interface CalDAVConfig {
-    /** Fastmail email address */
+    /** Account email address */
     username: string;
     /** App password (NOT API token - CalDAV requires Basic auth) */
     password: string;

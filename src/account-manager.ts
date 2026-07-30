@@ -1,9 +1,9 @@
 /**
- * Multi-account configuration management for Fastmail Courier MCP server
+ * Multi-account configuration management for Email Courier MCP server
  * 
  * Account configuration can be loaded from:
- * - Environment variables (FASTMAIL_API_TOKEN, FASTMAIL_CALDAV_PASSWORD)
- * - Config file (~/.config/fastmail-courier/accounts.json)
+ * - Environment variables (COURIER_API_TOKEN, COURIER_CALDAV_PASSWORD)
+ * - Config file (~/.config/email-courier/accounts.json)
  */
 
 import { readFileSync, existsSync, statSync } from 'node:fs';
@@ -14,9 +14,9 @@ import type { CalDAVConfig } from './caldav/types.js';
 import { getRequestContext } from './request-context.js';
 import { parseDisabledGroups, type ToolGroupId } from './tools/groups.js';
 
-const FASTMAIL_SESSION_URL = 'https://api.fastmail.com/jmap/session';
-const FASTMAIL_CALDAV_URL = 'https://caldav.fastmail.com';
-const CONFIG_DIR = join(homedir(), '.config', 'fastmail-courier');
+const DEFAULT_SESSION_URL = 'https://api.fastmail.com/jmap/session';
+const DEFAULT_CALDAV_URL = 'https://caldav.fastmail.com';
+const CONFIG_DIR = join(homedir(), '.config', 'email-courier');
 const CONFIG_FILE = join(CONFIG_DIR, 'accounts.json');
 
 /**
@@ -96,10 +96,10 @@ export class AccountManager {
 
         // Priority 1: Environment variables (single account)
         if (allowEnv) {
-            const envToken = process.env.FASTMAIL_API_TOKEN;
-            const envEmail = process.env.FASTMAIL_EMAIL;
-            const envCalDAVPassword = process.env.FASTMAIL_CALDAV_PASSWORD;
-            const envCalDAVUsername = process.env.FASTMAIL_CALDAV_USERNAME;
+            const envToken = process.env.COURIER_API_TOKEN;
+            const envEmail = process.env.COURIER_EMAIL;
+            const envCalDAVPassword = process.env.COURIER_CALDAV_PASSWORD;
+            const envCalDAVUsername = process.env.COURIER_CALDAV_USERNAME;
 
             // Store env CalDAV password for fallback
             if (envCalDAVPassword) {
@@ -111,7 +111,7 @@ export class AccountManager {
                 const extendedConfig: ExtendedAccountConfig = {
                     name,
                     token: envToken,
-                    sessionUrl: FASTMAIL_SESSION_URL,
+                    sessionUrl: DEFAULT_SESSION_URL,
                 };
 
                 // Add CalDAV config if password provided
@@ -119,7 +119,7 @@ export class AccountManager {
                     extendedConfig.caldav = {
                         password: envCalDAVPassword,
                         username: envCalDAVUsername || name,
-                        serverUrl: FASTMAIL_CALDAV_URL,
+                        serverUrl: DEFAULT_CALDAV_URL,
                     };
                 }
 
@@ -171,11 +171,11 @@ export class AccountManager {
         for (const account of config.accounts) {
             const accountConfig: ExtendedAccountConfig = {
                 ...account,
-                sessionUrl: account.sessionUrl || FASTMAIL_SESSION_URL,
+                sessionUrl: account.sessionUrl || DEFAULT_SESSION_URL,
             };
 
             if (accountConfig.caldav) {
-                accountConfig.caldav.serverUrl = accountConfig.caldav.serverUrl || FASTMAIL_CALDAV_URL;
+                accountConfig.caldav.serverUrl = accountConfig.caldav.serverUrl || DEFAULT_CALDAV_URL;
                 accountConfig.caldav.username = accountConfig.caldav.username || account.name;
             }
 
@@ -363,7 +363,7 @@ export class AccountManager {
             return {
                 username: account.caldav.username || account.name,
                 password: account.caldav.password,
-                serverUrl: account.caldav.serverUrl || FASTMAIL_CALDAV_URL,
+                serverUrl: account.caldav.serverUrl || DEFAULT_CALDAV_URL,
             };
         }
 
@@ -372,7 +372,7 @@ export class AccountManager {
             return {
                 username: account.name,
                 password: this.envCalDAVPassword,
-                serverUrl: FASTMAIL_CALDAV_URL,
+                serverUrl: DEFAULT_CALDAV_URL,
             };
         }
 

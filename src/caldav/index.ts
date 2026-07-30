@@ -2,7 +2,7 @@
  * CalDAV Module Exports
  */
 
-export { FastmailCalDAVClient, getCalDAVClient, clearCalDAVClientCache } from './client.js';
+export { CalDAVClient, getCalDAVClient, clearCalDAVClientCache } from './client.js';
 export type {
     CalDAVConfig,
     Calendar,

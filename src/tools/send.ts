@@ -46,7 +46,7 @@ export async function sendEmail(
     const account = manager.getCurrentAccount();
 
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
@@ -86,7 +86,7 @@ export async function forwardEmail(
     const account = manager.getCurrentAccount();
 
     if (!account) {
-        throw new Error('No account configured. Set FASTMAIL_API_TOKEN or configure accounts.');
+        throw new Error('No account configured. Set COURIER_API_TOKEN or configure accounts.');
     }
 
     const client = getClient(account);
