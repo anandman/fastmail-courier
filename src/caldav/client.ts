@@ -24,6 +24,84 @@ import type {
 const DEFAULT_CALDAV_URL = 'https://caldav.fastmail.com';
 
 /**
+ * Undoes RFC 5545 line folding.
+ *
+ * iCalendar splits any line longer than 75 octets, continuing it on the next
+ * line after a single space or tab. Every property regex below is line-anchored,
+ * so folding breaks them in two different ways: an `ATTENDEE` folded right after
+ * `mailto:` still matches but captures an empty string, while one folded
+ * anywhere else stops matching at all and is dropped without trace. Long
+ * SUMMARY, LOCATION and DESCRIPTION values are truncated at the fold the same
+ * way. Unfold once, before anything reads the data.
+ */
+export function unfoldICalendar(raw: string): string {
+    return raw.replace(/(?:\r\n|\r|\n)[ \t]/g, '');
+}
+
+/**
+ * Decodes an RFC 5545 escaped TEXT value -- the exact inverse of
+ * `escapeICalText`, which this client has always applied when writing.
+ *
+ * Scanning once, left to right, is what keeps an escaped backslash from being
+ * re-read as the opening of the next escape: `\\n` is a backslash followed by
+ * the letter n, not a newline.
+ */
+export function decodeICalendarText(value: string): string {
+    let out = '';
+    for (let i = 0; i < value.length; i++) {
+        if (value[i] !== '\\' || i === value.length - 1) {
+            out += value[i];
+            continue;
+        }
+        const escaped = value[++i];
+        // \n and \N are newlines; \\ \, and \; all stand for themselves.
+        out += escaped === 'n' || escaped === 'N' ? '\n' : escaped;
+    }
+    return out;
+}
+
+/**
+ * Splits a comma-separated TEXT list without breaking on escaped commas.
+ *
+ * Splitting has to happen before unescaping: decode first and a `\,` inside a
+ * single category becomes an ordinary comma, which then splits that category in
+ * two.
+ */
+export function splitICalendarList(value: string): string[] {
+    const parts: string[] = [];
+    let current = '';
+    for (let i = 0; i < value.length; i++) {
+        if (value[i] === '\\' && i + 1 < value.length) {
+            current += value[i] + value[i + 1];
+            i++;
+        } else if (value[i] === ',') {
+            parts.push(current);
+            current = '';
+        } else {
+            current += value[i];
+        }
+    }
+    parts.push(current);
+    return parts;
+}
+
+/**
+ * Extracts the address from a CAL-ADDRESS property value.
+ *
+ * `mailto:` is overwhelmingly the common scheme but RFC 5545 does not require
+ * it, so match the property generally and strip the scheme afterwards rather
+ * than demanding it up front and silently losing anything else.
+ */
+export function calAddress(value: string): string {
+    return value.trim().replace(/^mailto:/i, '');
+}
+
+/** Matches a property and its parameters, capturing only the value. */
+function propertyPattern(property: string, flags: string): RegExp {
+    return new RegExp(`^${property}(?:;[^\\r\\n:]*)?:(.*)$`, flags);
+}
+
+/**
  * CalDAV client for calendars and tasks
  */
 export class CalDAVClient {
@@ -480,16 +558,22 @@ export class CalDAVClient {
     }
 
     private parseVTODO(obj: DAVObject, calendarUrl?: string): Task | null {
-        const data = obj.data;
-        if (!data || !data.includes('VTODO')) {
+        const raw = obj.data;
+        if (!raw || !raw.includes('VTODO')) {
             return null;
         }
+        const data = unfoldICalendar(raw);
 
         // Parse iCalendar VTODO component
         const getValue = (property: string): string | undefined => {
-            const regex = new RegExp(`^${property}[^:]*:(.*)$`, 'mi');
-            const match = data.match(regex);
+            const match = data.match(propertyPattern(property, 'mi'));
             return match ? match[1].trim() : undefined;
+        };
+
+        /** For TEXT-typed properties, which carry escaped commas and newlines. */
+        const getTextValue = (property: string): string | undefined => {
+            const value = getValue(property);
+            return value === undefined ? undefined : decodeICalendarText(value);
         };
 
         const getDateValue = (property: string): string | undefined => {
@@ -517,7 +601,7 @@ export class CalDAVClient {
         };
 
         const uid = getValue('UID');
-        const summary = getValue('SUMMARY');
+        const summary = getTextValue('SUMMARY');
 
         if (!uid || !summary) {
             return null;
@@ -536,14 +620,18 @@ export class CalDAVClient {
         const percentComplete = percentRaw ? parseInt(percentRaw, 10) : undefined;
 
         const categoriesRaw = getValue('CATEGORIES');
-        const categories = categoriesRaw ? categoriesRaw.split(',').map(c => c.trim()) : undefined;
+        const categories = categoriesRaw
+            ? splitICalendarList(categoriesRaw)
+                  .map((c) => decodeICalendarText(c).trim())
+                  .filter((c) => c.length > 0)
+            : undefined;
 
         return {
             url: obj.url,
             etag: obj.etag || '',
             uid,
             summary,
-            description: getValue('DESCRIPTION'),
+            description: getTextValue('DESCRIPTION'),
             status,
             priority: priority && priority > 0 ? priority : undefined,
             due: getDateValue('DUE'),
@@ -710,15 +798,21 @@ export class CalDAVClient {
     // =========================================================================
 
     private parseVEVENT(obj: DAVObject, calendarUrl?: string): CalendarEvent | null {
-        const data = obj.data;
-        if (!data || !data.includes('VEVENT')) {
+        const raw = obj.data;
+        if (!raw || !raw.includes('VEVENT')) {
             return null;
         }
+        const data = unfoldICalendar(raw);
 
         const getValue = (property: string): string | undefined => {
-            const regex = new RegExp(`^${property}[^:]*:(.*)$`, 'mi');
-            const match = data.match(regex);
+            const match = data.match(propertyPattern(property, 'mi'));
             return match ? match[1].trim() : undefined;
+        };
+
+        /** For TEXT-typed properties, which carry escaped commas and newlines. */
+        const getTextValue = (property: string): string | undefined => {
+            const value = getValue(property);
+            return value === undefined ? undefined : decodeICalendarText(value);
         };
 
         const getDateValue = (property: string): { value: string; isAllDay: boolean } | undefined => {
@@ -755,7 +849,7 @@ export class CalDAVClient {
         };
 
         const uid = getValue('UID');
-        const summary = getValue('SUMMARY');
+        const summary = getTextValue('SUMMARY');
         const startInfo = getDateValue('DTSTART');
 
         if (!uid || !summary || !startInfo) {
@@ -770,19 +864,26 @@ export class CalDAVClient {
         else if (statusRaw === 'cancelled') status = 'cancelled';
 
         const categoriesRaw = getValue('CATEGORIES');
-        const categories = categoriesRaw ? categoriesRaw.split(',').map(c => c.trim()) : undefined;
+        const categories = categoriesRaw
+            ? splitICalendarList(categoriesRaw)
+                  .map((c) => decodeICalendarText(c).trim())
+                  .filter((c) => c.length > 0)
+            : undefined;
 
-        // Parse attendees (simplified)
-        const attendeeRegex = /^ATTENDEE[^:]*:mailto:(.*)$/gmi;
+        // Attendees. Empty entries are dropped rather than passed on: an address
+        // we failed to read is not an anonymous guest, and a model shown `""`
+        // will describe one.
+        const attendeeRegex = propertyPattern('ATTENDEE', 'gmi');
         const attendees: string[] = [];
         let attendeeMatch;
         while ((attendeeMatch = attendeeRegex.exec(data)) !== null) {
-            attendees.push(attendeeMatch[1].trim());
+            const address = calAddress(attendeeMatch[1]);
+            if (address) attendees.push(address);
         }
 
         // Parse organizer
-        const organizerMatch = data.match(/^ORGANIZER[^:]*:mailto:(.*)$/mi);
-        const organizer = organizerMatch ? organizerMatch[1].trim() : undefined;
+        const organizerMatch = data.match(propertyPattern('ORGANIZER', 'mi'));
+        const organizer = organizerMatch ? calAddress(organizerMatch[1]) || undefined : undefined;
 
         // Parse RECURRENCE-ID (present on expanded recurring event instances)
         const recurrenceIdInfo = getDateValue('RECURRENCE-ID');
@@ -792,9 +893,9 @@ export class CalDAVClient {
             etag: obj.etag || '',
             uid,
             summary,
-            description: getValue('DESCRIPTION'),
+            description: getTextValue('DESCRIPTION'),
             status,
-            location: getValue('LOCATION'),
+            location: getTextValue('LOCATION'),
             start: startInfo.value,
             end: endInfo?.value,
             allDay: startInfo.isAllDay,
