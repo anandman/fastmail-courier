@@ -9,7 +9,7 @@ import type { EmailFilter, EmailSummary } from 'jmap-courier';
 
 // Tool schemas
 export const searchEmailsSchema = z.object({
-    mailbox: z.string().optional().describe('Mailbox name or ID to search in (e.g., "Inbox", "Sent", "Archive"). Omit to search all mail EXCEPT Junk and Trash, which is usually what you want. Pass "Inbox" when the question is specifically about the inbox ("do I have new mail?", "what is my latest unread message?"), since mail filed into other folders would otherwise be included. Pass "Junk" or "Trash" explicitly to search those — they are never searched by default.'),
+    mailbox: z.string().optional().describe('Mailbox to search in. Omit to search all mail EXCEPT Junk and Trash, which is usually what you want. Pass "Inbox" when the question is specifically about the inbox ("do I have new mail?", "what is my latest unread message?"), since mail filed into other folders would otherwise be included. Pass "Junk" or "Trash" explicitly to search those — they are never searched by default. The standard names ("Inbox", "Sent", "Drafts", "Archive", "Junk", "Trash") always find the right folder whatever the provider calls it — "Junk" finds a folder named "Spam". Any other folder is matched by name, or by full path ("migrated/Junk") when the name is ambiguous.'),
     query: z.string().optional().describe('Full-text search query (use sparingly; can expand results).'),
     from: z.string().optional().describe('Filter by sender email or name'),
     to: z.string().optional().describe('Filter by recipient email or name'),
