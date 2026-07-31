@@ -102,6 +102,33 @@ function propertyPattern(property: string, flags: string): RegExp {
 }
 
 /**
+ * Splits a VCALENDAR into its individual components of one type.
+ *
+ * A calendar object is not one event. With `expand: true` the server returns a
+ * single object per recurring series containing one VEVENT per occurrence, each
+ * carrying its own DTSTART and RECURRENCE-ID -- so a three-day query on a daily
+ * camp comes back as one object holding three VEVENTs.
+ *
+ * Reading such an object as a single event fails twice over: the scalar
+ * properties resolve to whichever component appears first, so only the earliest
+ * occurrence is reported, while a repeated property like ATTENDEE is gathered
+ * across every component at once and arrives multiplied by the number of
+ * occurrences. Parse each component separately instead.
+ *
+ * The non-greedy body stops at the first END, which is what keeps a nested
+ * VALARM from swallowing the rest of the enclosing VEVENT.
+ */
+export function splitComponents(data: string, component: 'VEVENT' | 'VTODO'): string[] {
+    const pattern = new RegExp(`BEGIN:${component}\\r?\\n([\\s\\S]*?)END:${component}`, 'g');
+    const components: string[] = [];
+    let match;
+    while ((match = pattern.exec(data)) !== null) {
+        components.push(match[1]);
+    }
+    return components;
+}
+
+/**
  * CalDAV client for calendars and tasks
  */
 export class CalDAVClient {
@@ -190,9 +217,10 @@ export class CalDAVClient {
                 });
 
                 for (const obj of calendarObjects) {
-                    const task = this.parseVTODO(obj, calendar.url);
-                    if (task && this.matchesFilter(task, options)) {
-                        allTasks.push(task);
+                    for (const task of this.parseVTODOs(obj, calendar.url)) {
+                        if (this.matchesFilter(task, options)) {
+                            allTasks.push(task);
+                        }
                     }
                 }
             } catch (error) {
@@ -228,7 +256,7 @@ export class CalDAVClient {
                 return null;
             }
 
-            return this.parseVTODO(objects[0]);
+            return this.parseVTODOs(objects[0])[0] ?? null;
         } catch {
             return null;
         }
@@ -393,10 +421,7 @@ export class CalDAVClient {
                 });
 
                 for (const obj of calendarObjects) {
-                    const event = this.parseVEVENT(obj, calendar.url);
-                    if (event) {
-                        allEvents.push(event);
-                    }
+                    allEvents.push(...this.parseVEVENTs(obj, calendar.url));
                 }
             } catch (error) {
                 console.warn(`Failed to fetch events from ${calendar.url}:`, error);
@@ -428,7 +453,9 @@ export class CalDAVClient {
                 return null;
             }
 
-            return this.parseVEVENT(objects[0]);
+            // Fetched by URL without expansion, so this is the series master
+            // plus any overrides. The first component is the event itself.
+            return this.parseVEVENTs(objects[0])[0] ?? null;
         } catch {
             return null;
         }
@@ -557,13 +584,22 @@ export class CalDAVClient {
         };
     }
 
-    private parseVTODO(obj: DAVObject, calendarUrl?: string): Task | null {
+    /** Parses every VTODO in a calendar object, not just the first. */
+    private parseVTODOs(obj: DAVObject, calendarUrl?: string): Task[] {
         const raw = obj.data;
         if (!raw || !raw.includes('VTODO')) {
-            return null;
+            return [];
         }
         const data = unfoldICalendar(raw);
+        const components = splitComponents(data, 'VTODO');
+        const sources = components.length > 0 ? components : [data];
 
+        return sources
+            .map((component) => this.parseVTODOComponent(component, obj, calendarUrl))
+            .filter((task): task is Task => task !== null);
+    }
+
+    private parseVTODOComponent(data: string, obj: DAVObject, calendarUrl?: string): Task | null {
         // Parse iCalendar VTODO component
         const getValue = (property: string): string | undefined => {
             const match = data.match(propertyPattern(property, 'mi'));
@@ -797,13 +833,34 @@ export class CalDAVClient {
     // VEVENT Helper Methods
     // =========================================================================
 
-    private parseVEVENT(obj: DAVObject, calendarUrl?: string): CalendarEvent | null {
+    /**
+     * Parses every VEVENT in a calendar object.
+     *
+     * Returns one entry per expanded occurrence, so a recurring series spanning
+     * the queried range yields an event per day rather than only its first.
+     */
+    private parseVEVENTs(obj: DAVObject, calendarUrl?: string): CalendarEvent[] {
         const raw = obj.data;
         if (!raw || !raw.includes('VEVENT')) {
-            return null;
+            return [];
         }
         const data = unfoldICalendar(raw);
+        const components = splitComponents(data, 'VEVENT');
 
+        // If the markers are missing or malformed, fall back to treating the
+        // whole object as one component rather than silently returning nothing.
+        const sources = components.length > 0 ? components : [data];
+
+        return sources
+            .map((component) => this.parseVEVENTComponent(component, obj, calendarUrl))
+            .filter((event): event is CalendarEvent => event !== null);
+    }
+
+    private parseVEVENTComponent(
+        data: string,
+        obj: DAVObject,
+        calendarUrl?: string
+    ): CalendarEvent | null {
         const getValue = (property: string): string | undefined => {
             const match = data.match(propertyPattern(property, 'mi'));
             return match ? match[1].trim() : undefined;

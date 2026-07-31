@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     calAddress,
     decodeICalendarText,
+    splitComponents,
     splitICalendarList,
     unfoldICalendar,
 } from '../src/caldav/client.js';
@@ -118,6 +119,103 @@ describe('list splitting', () => {
 
     it('returns a single item when there is no comma', () => {
         expect(splitICalendarList('solo')).toEqual(['solo']);
+    });
+});
+
+describe('component splitting', () => {
+    /**
+     * Shaped after what Fastmail actually returns for `expand: true`: one
+     * calendar object per series, holding one VEVENT per occurrence. Verified
+     * against a live three-day query on a daily camp, which came back as a
+     * single object containing three VEVENTs.
+     */
+    const expandedSeries = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'BEGIN:VEVENT',
+        'UID:camp-1',
+        'SUMMARY:Day Camp',
+        'DTSTART:20260729T160000Z',
+        'RECURRENCE-ID:20260729T160000Z',
+        'ATTENDEE;CN=A:mailto:a@example.com',
+        'END:VEVENT',
+        'BEGIN:VEVENT',
+        'UID:camp-1',
+        'SUMMARY:Day Camp',
+        'DTSTART:20260730T160000Z',
+        'RECURRENCE-ID:20260730T160000Z',
+        'ATTENDEE;CN=A:mailto:a@example.com',
+        'END:VEVENT',
+        'BEGIN:VEVENT',
+        'UID:camp-1',
+        'SUMMARY:Day Camp',
+        'DTSTART:20260731T160000Z',
+        'RECURRENCE-ID:20260731T160000Z',
+        'ATTENDEE;CN=A:mailto:a@example.com',
+        'END:VEVENT',
+        'END:VCALENDAR',
+    ].join('\r\n');
+
+    it('returns one component per expanded occurrence', () => {
+        // Reading the object as a single event reported only 2026-07-29 and
+        // dropped the other two days without any sign it had done so.
+        expect(splitComponents(expandedSeries, 'VEVENT')).toHaveLength(3);
+    });
+
+    it('gives each component its own DTSTART', () => {
+        const starts = splitComponents(expandedSeries, 'VEVENT').map(
+            (c) => c.match(/^DTSTART[^:]*:(.*)$/m)![1].trim()
+        );
+
+        expect(starts).toEqual(['20260729T160000Z', '20260730T160000Z', '20260731T160000Z']);
+    });
+
+    it('scopes repeated properties to their own component', () => {
+        // The counterpart failure: ATTENDEE was collected across the whole
+        // object, so two guests over three occurrences arrived as six.
+        const perComponent = splitComponents(expandedSeries, 'VEVENT').map(
+            (c) => (c.match(/^ATTENDEE/gm) || []).length
+        );
+
+        expect(perComponent).toEqual([1, 1, 1]);
+    });
+
+    it('does not let a nested VALARM swallow the rest of the event', () => {
+        const withAlarm = [
+            'BEGIN:VCALENDAR',
+            'BEGIN:VEVENT',
+            'UID:a',
+            'BEGIN:VALARM',
+            'ACTION:DISPLAY',
+            'END:VALARM',
+            'SUMMARY:After the alarm',
+            'END:VEVENT',
+            'BEGIN:VEVENT',
+            'UID:b',
+            'END:VEVENT',
+            'END:VCALENDAR',
+        ].join('\r\n');
+
+        const components = splitComponents(withAlarm, 'VEVENT');
+
+        expect(components).toHaveLength(2);
+        expect(components[0]).toContain('SUMMARY:After the alarm');
+    });
+
+    it('finds the single component in an ordinary one-event object', () => {
+        const single = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nEND:VEVENT\r\nEND:VCALENDAR';
+        expect(splitComponents(single, 'VEVENT')).toHaveLength(1);
+    });
+
+    it('splits VTODO the same way', () => {
+        const tasks =
+            'BEGIN:VCALENDAR\r\nBEGIN:VTODO\r\nUID:t1\r\nEND:VTODO\r\nBEGIN:VTODO\r\nUID:t2\r\nEND:VTODO\r\nEND:VCALENDAR';
+        expect(splitComponents(tasks, 'VTODO')).toHaveLength(2);
+    });
+
+    it('returns nothing when the component type is absent', () => {
+        // The caller falls back to the whole object rather than dropping it.
+        expect(splitComponents('BEGIN:VCALENDAR\r\nEND:VCALENDAR', 'VEVENT')).toEqual([]);
     });
 });
 
