@@ -742,6 +742,34 @@ export function renderLoginPage(authMode: AuthMode): string {
     );
 }
 
+/**
+ * Shown at /authorize when the client is not registered here.
+ *
+ * This response is rendered in a browser, because /authorize is the one OAuth
+ * endpoint a person actually looks at. Refusing to redirect is required -- an
+ * unvalidated redirect_uri must never be honoured, or the endpoint becomes an
+ * open redirect -- but the SDK's bare `{"error":"invalid_client"}` gives the
+ * person staring at it nothing to act on. The cause is almost always a client
+ * still presenting a client_id that was revoked or lost, and clients do not
+ * re-register on their own, so say what to do about it.
+ */
+export function renderUnknownClientPage(): string {
+    return documentShell(
+        'Email Courier',
+        `<main class="center-card">
+          ${brandMark()}
+          <h1>This application is no longer authorized</h1>
+          <p>It is asking for access using a registration Courier does not recognize — usually because that authorization was revoked, or the server's client registry was reset.</p>
+          <div class="notice">
+            <strong>To reconnect:</strong> remove Email Courier from the application's
+            settings, then add it again. The application will register itself afresh.
+            Some apps cache the old registration until they are fully restarted.
+          </div>
+          <p><a href="/ui">Review your authorized applications</a></p>
+        </main>`
+    );
+}
+
 export function renderNoVaultPage(): string {
     return documentShell(
         'Email Courier',

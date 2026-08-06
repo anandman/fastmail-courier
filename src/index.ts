@@ -20,6 +20,7 @@ import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middlew
 import express from 'express';
 
 import { CourierClientStore } from './auth/client-store.js';
+import { guardUnknownClient, logTokenFailures } from './auth/diagnostics.js';
 import { CourierOAuthProvider } from './auth/oauth-provider.js';
 import { TokenService } from './auth/tokens.js';
 import { loadOidcProviderConfig, loadOidcUiConfig, parseAllowedUsers, verifyIdToken } from './auth/oidc.js';
@@ -32,7 +33,12 @@ import { createMcpServer } from './mcp-server.js';
 import { createVaultStore } from './vault/index.js';
 import { runWithRequestContext } from './request-context.js';
 import { createUserAccountManager } from './user-accounts.js';
-import { renderLoginPage, renderNoVaultPage, renderUiPage } from './ui.js';
+import {
+    renderLoginPage,
+    renderNoVaultPage,
+    renderUiPage,
+    renderUnknownClientPage,
+} from './ui.js';
 
 // Main function
 function parsePort(value: string | undefined, fallback: number): number {
@@ -276,6 +282,12 @@ async function startHttpServer() {
         // provider is reached only from the user's browser during login, never
         // from a client, so provider-side client caps or datacenter-IP filtering
         // cannot break a connection.
+        // Both sit in front of the SDK router: it rejects an unknown client
+        // before the provider is reached, so neither case is visible from
+        // inside the provider.
+        app.post('/token', logTokenFailures());
+        app.get('/authorize', guardUnknownClient(clientStore, renderUnknownClientPage));
+
         app.use(
             mcpAuthRouter({
                 provider,
